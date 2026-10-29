@@ -21,9 +21,14 @@ this file** ("What is missing" and "What is not working / known issues"):
   `src/client` → `StarterPlayer.StarterPlayerScripts.Client`.
 - The whole world is generated in code at server start (`WorldBuilder`);
   there is no place file to keep in sync.
-- No Luau toolchain (luau-analyze, selene, StyLua) is installed in the cloud
-  session. Code can't be run or type-checked here, so be extra careful and say
-  so when reporting.
+- No Luau toolchain is installed in the cloud session, and the user can't always
+  run Studio. **GitHub Actions is the check**: `.github/workflows/check.yml` runs on
+  every push: `rojo build` (uploads `BuildYourShip.rbxl` as an artifact), `selene src`
+  (warnings fail the build) and `luau-lsp analyze` against the Roblox API types.
+  After pushing, read the run's logs and keep it green. Tool versions: `aftman.toml`
+  (luau-lsp is fetched as the latest release).
+- Passing CI only proves syntax, lint and types are fine. It does **not** run the
+  game, so physics, gameplay and visuals are still untested until a Studio playtest.
 
 ## Architecture
 
@@ -101,8 +106,13 @@ villages on every island, sea zones with rowing → sailing → steam eras and t
 
 Nothing below has been confirmed in Studio; these are risks or known gaps.
 
-- [ ] **Untested**: the whole codebase has never been run or type-checked. Expect
-      runtime errors on first play; fix them and update this list.
+- [ ] **Never run**: the game has never been started in Studio. CI (build, selene,
+      luau-lsp) passes, so syntax and types are OK, but runtime errors, wrong
+      Roblox property values and gameplay bugs are still likely on first play.
+- [ ] Type checking runs in non-strict mode for most files, so it won't catch every
+      nil/field mistake.
+- [ ] `Player:LoadCharacterAsync` is used because the type checker marked `LoadCharacter`
+      deprecated; behaviour should be identical but is unverified.
 - [ ] Ship physics tuning (LinearVelocity / AlignPosition / AlignOrientation forces,
       float height, turn rates) is unverified; ships may jitter, sink into or bounce off terrain.
 - [ ] Ramming is detected from a sudden speed drop plus a box query in front of the bow.
