@@ -31,7 +31,7 @@ end
 -- Captain first, then members
 function CrewService.Members(captain: Player): { Player }
 	local list = { captain }
-	for _, member in crews[captain] or {} do
+	for _, member in crews[captain] or ({} :: { Player }) do
 		table.insert(list, member)
 	end
 	return list

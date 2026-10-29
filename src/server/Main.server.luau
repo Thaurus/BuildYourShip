@@ -68,11 +68,11 @@ local function onPlayerAdded(player: Player)
 		humanoid.Died:Connect(function()
 			task.wait(4)
 			if player.Parent then
-				player:LoadCharacter()
+				player:LoadCharacterAsync()
 			end
 		end)
 	end)
-	player:LoadCharacter()
+	player:LoadCharacterAsync()
 
 	services.ShipService.SpawnPlayerShip(player)
 	services.StateService.Push(player)

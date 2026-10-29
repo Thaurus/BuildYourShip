@@ -8,7 +8,7 @@ local RunService = game:GetService("RunService")
 
 local WeatherController = {}
 
-function WeatherController.Init(ctx)
+function WeatherController.Init(_ctx)
 	local weather = ReplicatedStorage:WaitForChild("Weather")
 	local camera = workspace.CurrentCamera
 	local atmosphere = Lighting:WaitForChild("SeaAir", 10) :: Atmosphere?

@@ -397,7 +397,7 @@ local function makeFlaxBush(parent, pos: Vector3, rng: Random)
 		local off = Vector3.new(math.cos(a), 0, math.sin(a)) * 1.1
 		ball(m, "Yield", pos + off + Vector3.new(0, 1.3, 0), rng:NextNumber(2.4, 3), Color3.fromRGB(150, 210, 90))
 	end
-	for i = 1, 5 do
+	for _ = 1, 5 do
 		local off = Vector3.new(rng:NextNumber(-1.6, 1.6), rng:NextNumber(2.4, 3.2), rng:NextNumber(-1.6, 1.6))
 		ball(m, "Yield", pos + off, 0.7, Color3.fromRGB(120, 170, 255), { CanCollide = false })
 	end
@@ -903,7 +903,7 @@ local function makeVillage(folder, def, rng: Random, plaza: Vector3, block)
 		light.Color = Palette.Lamp
 		light.Parent = lamp
 	end
-	for i = 1, 4 do
+	for _ = 1, 4 do
 		local a = rng:NextNumber(0, math.pi * 2)
 		local p = centre + Vector3.new(math.cos(a), 0, math.sin(a)) * rng:NextNumber(5, 9)
 		vcyl(square, "Barrel", p + Vector3.new(0, 1, 0), 2, 1.6, Palette.Wood, { Material = M.Wood })
@@ -1287,7 +1287,7 @@ function WorldBuilder.CreateDrydock(origin: Vector3, bounds, slot: number)
 		slab("WallZ", Vector3.new(width, wallHeight, wall), centre + Vector3.new(0, floorY + wallHeight / 2, side * (length / 2 + wall / 2)), Palette.Stone)
 	end
 	-- Walkway all around
-	local outerW, outerL = width + (wall + walk) * 2, length + (wall + walk) * 2
+	local outerL = length + (wall + walk) * 2
 	for _, side in { -1, 1 } do
 		slab("WalkX", Vector3.new(walk, 1, outerL), centre + Vector3.new(side * (width / 2 + wall + walk / 2), walkY - 0.5, 0), Palette.WoodLight)
 		slab("WalkZ", Vector3.new(width + wall * 2, 1, walk), centre + Vector3.new(0, walkY - 0.5, side * (length / 2 + wall + walk / 2)), Palette.WoodLight)

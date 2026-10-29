@@ -28,14 +28,14 @@ local C = UIKit.Colors
 function UIKit.Create(className: string, props: { [string]: any }?, children: { Instance }?): any
 	local inst = Instance.new(className)
 	local parent
-	for key, value in props or {} do
+	for key, value in props or ({} :: { [string]: any }) do
 		if key == "Parent" then
 			parent = value
 		else
 			inst[key] = value
 		end
 	end
-	for _, child in children or {} do
+	for _, child in children or ({} :: { Instance }) do
 		child.Parent = inst
 	end
 	if parent then
@@ -450,7 +450,7 @@ function UIKit.Toast(screen: ScreenGui, text: string, kind: string?)
 
 	-- Keep the stack short
 	local toasts = {}
-	for _, child in toastStack:GetChildren() do
+	for _, child in (toastStack :: Frame):GetChildren() do
 		if child:IsA("Frame") then
 			table.insert(toasts, child)
 		end

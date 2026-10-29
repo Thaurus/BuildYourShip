@@ -161,7 +161,7 @@ function BuildController.Init(ctx)
 	local slotButtons = {}
 	local refreshBar
 
-	local function select(id: string)
+	local function selectBlock(id: string)
 		selected = id
 		deleteMode = false
 		refreshBar()
@@ -176,7 +176,7 @@ function BuildController.Init(ctx)
 			LayoutOrder = i,
 			Parent = slots,
 			OnClick = function()
-				select(id)
+				selectBlock(id)
 			end,
 		})
 		UIKit.Label({
@@ -358,14 +358,16 @@ function BuildController.Init(ctx)
 
 		-- Bows change shape with their side of the ship, so the ghost depends on x too
 		local key = `{selected}:{rot}:{math.sign(cell.X)}`
-		if key ~= ghostKey then
+		if key ~= ghostKey or not ghost then
 			clearGhost()
-			ghost = BlockFactory.MakeGhost(BlockFactory.Create(selected, { X = cell.X }))
-			ghost.Parent = camera
+			local created = BlockFactory.MakeGhost(BlockFactory.Create(selected, { X = cell.X }))
+			created.Parent = camera
+			ghost = created
 			ghostKey = key
 		end
-		ghost:PivotTo(root.CFrame * ShipGrid.CellToCFrame(cell.X, cell.Y, cell.Z, rot))
-		selection.Adornee = ghost
+		local preview = ghost :: Model
+		preview:PivotTo(root.CFrame * ShipGrid.CellToCFrame(cell.X, cell.Y, cell.Z, rot))
+		selection.Adornee = preview
 		selection.Color3 = if valid then VALID else INVALID
 		selection.SurfaceColor3 = selection.Color3
 		target = { x = cell.X, y = cell.Y, z = cell.Z, valid = valid, reason = reason }
@@ -412,18 +414,19 @@ function BuildController.Init(ctx)
 			selected = selected or placeable[1]
 		end
 		local b = (State.Data and State.Data.Bounds) or Config.BUILD_BOUNDS
-		bounds = Instance.new("Part")
-		bounds.Name = "BuildBounds"
-		bounds.Anchored = true
-		bounds.CanCollide = false
-		bounds.CanQuery = false
-		bounds.CanTouch = false
-		bounds.CastShadow = false
-		bounds.Material = Enum.Material.ForceField
-		bounds.Color = C.Blue
-		bounds.Transparency = 0.2
-		bounds.Size = Vector3.new(b.MaxX - b.MinX + 1, b.MaxY - b.MinY + 1, b.MaxZ - b.MinZ + 1) * G
-		bounds.Parent = camera
+		local frame = Instance.new("Part")
+		frame.Name = "BuildBounds"
+		frame.Anchored = true
+		frame.CanCollide = false
+		frame.CanQuery = false
+		frame.CanTouch = false
+		frame.CastShadow = false
+		frame.Material = Enum.Material.ForceField
+		frame.Color = C.Blue
+		frame.Transparency = 0.2
+		frame.Size = Vector3.new(b.MaxX - b.MinX + 1, b.MaxY - b.MinY + 1, b.MaxZ - b.MinZ + 1) * G
+		frame.Parent = camera
+		bounds = frame
 		renderConnection = RunService.RenderStepped:Connect(function()
 			update(nil)
 		end)
@@ -477,7 +480,7 @@ function BuildController.Init(ctx)
 		else
 			local number = input.KeyCode.Value - Enum.KeyCode.One.Value + 1
 			if number >= 1 and number <= 9 and placeable[number] then
-				select(placeable[number])
+				selectBlock(placeable[number])
 			end
 		end
 	end)

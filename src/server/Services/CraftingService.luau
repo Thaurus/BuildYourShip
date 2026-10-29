@@ -10,13 +10,12 @@ local Items = require(Shared.Items)
 local Remotes = require(Shared.Remotes)
 
 local CraftingService = {}
-local InventoryService, StateService, QuestService, GamepassService, DataService
+local InventoryService, QuestService, GamepassService, DataService
 
 local MAX_BATCH = 50
 
 function CraftingService.Init(services)
 	InventoryService = services.InventoryService
-	StateService = services.StateService
 	QuestService = services.QuestService
 	GamepassService = services.GamepassService
 	DataService = services.DataService
