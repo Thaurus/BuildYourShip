@@ -35,7 +35,7 @@ function UIKit.Create(className: string, props: { [string]: any }?, children: { 
 			inst[key] = value
 		end
 	end
-	for _, child in children or ({} :: { Instance }) do
+	for _, child in ipairs(children or {}) do
 		child.Parent = inst
 	end
 	if parent then
