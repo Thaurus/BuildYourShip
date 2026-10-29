@@ -15,6 +15,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Islands = require(Shared.Islands)
 local Palette = require(Shared.Palette)
+local Zones = require(Shared.Zones)
 
 local WorldBuilder = {}
 
@@ -302,6 +303,11 @@ local function sculptIsland(def, rng: Random)
 		Terrain:FillBall(Vector3.new(c.X, sea + R * 0.28, c.Z - R * 0.1), R * 0.3, Enum.Material.Snow)
 		Terrain:FillBall(Vector3.new(c.X, sea - R * 0.42, c.Z), R * 0.72, Enum.Material.Snow)
 		Terrain:FillBall(Vector3.new(c.X, sea - R * 0.5, c.Z), R * 0.7, Enum.Material.Grass)
+	elseif def.Biome == "Volcanic" then
+		Terrain:FillBall(Vector3.new(c.X, sea - R * 0.45, c.Z), R * 0.8, Enum.Material.Basalt)
+		Terrain:FillBall(Vector3.new(c.X - R * 0.1, sea + R * 0.05, c.Z - R * 0.15), R * 0.42, Enum.Material.Rock)
+		Terrain:FillBall(Vector3.new(c.X - R * 0.1, sea + R * 0.32, c.Z - R * 0.15), R * 0.16, Enum.Material.CrackedLava)
+		Terrain:FillBall(Vector3.new(c.X + R * 0.3, sea - R * 0.25, c.Z + R * 0.2), R * 0.35, Enum.Material.Ground)
 	end
 end
 
@@ -449,30 +455,6 @@ local function makeRock(parent, pos: Vector3, rng: Random, size: number)
 	return m
 end
 
-local function makeHut(parent, cf: CFrame, wallColor: Color3, roofColor: Color3)
-	local m = newModel(parent, "Hut")
-	newPart(m, { Name = "Floor", Size = Vector3.new(12, 1.2, 11), CFrame = cf * CFrame.new(0, 0.6, 0), Color = Palette.WoodDark })
-	newPart(m, { Name = "Walls", Size = Vector3.new(10, 7, 9), CFrame = cf * CFrame.new(0, 4.7, 0), Color = wallColor })
-	newPart(m, { Name = "Door", Size = Vector3.new(2.6, 4.6, 0.3), CFrame = cf * CFrame.new(0, 3.5, -4.55), Color = Palette.WoodDark })
-	newPart(m, { Name = "Knob", Size = Vector3.new(0.4, 0.4, 0.4), CFrame = cf * CFrame.new(0.8, 3.4, -4.75), Color = Palette.Yellow, Shape = Enum.PartType.Ball })
-	for _, x in { -3.3, 3.3 } do
-		newPart(m, { Name = "Window", Size = Vector3.new(1.8, 1.8, 0.3), CFrame = cf * CFrame.new(x, 5, -4.55), Color = Color3.fromRGB(150, 220, 255), Material = Enum.Material.Glass, Transparency = 0.2 })
-		newPart(m, { Name = "Sill", Size = Vector3.new(2.3, 0.3, 0.5), CFrame = cf * CFrame.new(x, 3.95, -4.65), Color = Palette.White })
-	end
-	-- Gable roof from two wedges
-	for _, side in { -1, 1 } do
-		newPart(m, {
-			ClassName = "WedgePart",
-			Name = "Roof",
-			Size = Vector3.new(11, 4, 6),
-			CFrame = cf * CFrame.new(0, 10.2, side * 2.75) * CFrame.Angles(0, if side == 1 then math.pi else 0, 0),
-			Color = roofColor,
-		})
-	end
-	vcyl(m, "Chimney", (cf * CFrame.new(3, 11, 2)).Position, 3, 1.4, Palette.RockDark)
-	return m
-end
-
 local function makeLighthouse(parent, pos: Vector3)
 	local m = newModel(parent, "Lighthouse")
 	local y = pos.Y
@@ -571,8 +553,8 @@ local function makePier(parent, def)
 	return m, start, finish
 end
 
-local function makeBuoy(parent, pos: Vector3, color: Color3)
-	local m = newModel(parent, "Buoy")
+local function makeBuoy(parent, pos: Vector3, color: Color3, outline: boolean?)
+	local m = newModel(parent, "Buoy", outline)
 	vcyl(m, "Float", Vector3.new(pos.X, Config.SEA_LEVEL + 0.4, pos.Z), 2.4, 3, color)
 	vcyl(m, "Band", Vector3.new(pos.X, Config.SEA_LEVEL + 1.6, pos.Z), 0.6, 3.05, Palette.White)
 	vcyl(m, "Pole", Vector3.new(pos.X, Config.SEA_LEVEL + 3.5, pos.Z), 3, 0.4, Palette.Ink)
@@ -775,6 +757,277 @@ end
 -- Island assembly
 --------------------------------------------------------------------------------
 
+--------------------------------------------------------------------------------
+-- Villages
+--------------------------------------------------------------------------------
+
+local HOUSE_STYLES = {
+	Harbour = { Wall = Palette.Plaster, WallMat = M.Plaster, Roof = Palette.RoofTile, RoofMat = M.ClayRoofTiles, Base = Palette.Stone, Timber = true, Chimney = true },
+	Stilts = { Wall = Color3.fromRGB(184, 150, 104), WallMat = M.Wood, Roof = Color3.fromRGB(196, 168, 104), RoofMat = M.Grass, Stilts = true },
+	Stone = { Wall = Palette.Stone, WallMat = M.Cobblestone, Roof = Color3.fromRGB(78, 80, 88), RoofMat = M.Slate, Base = Palette.RockDark, Chimney = true },
+	Cabin = { Wall = Palette.Trunk, WallMat = M.Wood, Roof = Palette.WoodDark, RoofMat = M.WoodPlanks, Base = Palette.Stone, Snow = true, Chimney = true },
+	Basalt = { Wall = Color3.fromRGB(74, 70, 70), WallMat = M.Basalt, Roof = Color3.fromRGB(60, 44, 38), RoofMat = M.RoofShingles, Base = Color3.fromRGB(50, 46, 46), Chimney = true },
+}
+
+local SHUTTERS = { Color3.fromRGB(64, 96, 132), Color3.fromRGB(120, 56, 48), Color3.fromRGB(70, 110, 70), Color3.fromRGB(150, 120, 60) }
+
+-- A house facing -Z of cf (its front door), standing on the ground at cf
+local function makeHouse(parent, cf: CFrame, styleName: string, rng: Random)
+	local style = HOUSE_STYLES[styleName] or HOUSE_STYLES.Harbour
+	local m = newModel(parent, "House")
+	local w, d = rng:NextNumber(9, 12), rng:NextNumber(8, 10)
+	local h = if rng:NextNumber() < 0.3 and not style.Stilts then rng:NextNumber(11, 13) else rng:NextNumber(6.5, 8)
+	local floorY = if style.Stilts then 3.5 else 0.5
+	local shutter = SHUTTERS[rng:NextInteger(1, #SHUTTERS)]
+
+	if style.Stilts then
+		for _, x in { -1, 1 } do
+			for _, z in { -1, 1 } do
+				vcyl(m, "Stilt", (cf * CFrame.new(x * (w / 2 - 0.5), floorY / 2 - 2, z * (d / 2 - 0.5))).Position, floorY + 4, 0.8, Palette.WoodDark)
+			end
+		end
+		newPart(m, { Name = "Platform", Size = Vector3.new(w + 2, 0.6, d + 3), CFrame = cf * CFrame.new(0, floorY - 0.3, -1), Color = Palette.WoodLight })
+		for i = 1, 4 do
+			newPart(m, { Name = "Step", Size = Vector3.new(2.6, 0.4, 1.2), CFrame = cf * CFrame.new(0, floorY - 0.3 - i * 0.85, -d / 2 - 2.5 - i * 1.1), Color = Palette.WoodLight })
+		end
+	else
+		newPart(m, { Name = "Foundation", Size = Vector3.new(w + 1, 4, d + 1), CFrame = cf * CFrame.new(0, floorY - 2, 0), Color = style.Base, Material = M.Cobblestone })
+	end
+
+	newPart(m, { Name = "Walls", Size = Vector3.new(w, h, d), CFrame = cf * CFrame.new(0, floorY + h / 2, 0), Color = style.Wall, Material = style.WallMat })
+	if style.Timber then
+		for _, x in { -1, 1 } do
+			for _, z in { -1, 1 } do
+				newPart(m, { Name = "Beam", Size = Vector3.new(0.5, h, 0.5), CFrame = cf * CFrame.new(x * w / 2, floorY + h / 2, z * d / 2), Color = Palette.WoodDark })
+			end
+		end
+		newPart(m, { Name = "Beam", Size = Vector3.new(w + 0.1, 0.45, d + 0.1), CFrame = cf * CFrame.new(0, floorY + h * 0.55, 0), Color = Palette.WoodDark })
+	end
+
+	-- Door and windows on the front
+	newPart(m, { Name = "Door", Size = Vector3.new(2.4, 4.4, 0.3), CFrame = cf * CFrame.new(0, floorY + 2.2, -d / 2 - 0.12), Color = Palette.WoodDark })
+	ball(m, "Knob", (cf * CFrame.new(0.8, floorY + 2.2, -d / 2 - 0.32)).Position, 0.3, Palette.Brass)
+	local rows = if h > 10 then { floorY + 3.2, floorY + h - 2.8 } else { floorY + 3.2 }
+	for _, y in rows do
+		for _, x in { -w / 2 + 2, w / 2 - 2 } do
+			newPart(m, { Name = "Window", Size = Vector3.new(1.6, 1.8, 0.2), CFrame = cf * CFrame.new(x, y, -d / 2 - 0.1), Color = Palette.Lamp, Material = M.Glass, Transparency = 0.25 })
+			newPart(m, { Name = "Frame", Size = Vector3.new(1.9, 2.1, 0.12), CFrame = cf * CFrame.new(x, y, -d / 2 - 0.05), Color = Palette.WoodLight })
+			for _, sx in { -1.25, 1.25 } do
+				newPart(m, { Name = "Shutter", Size = Vector3.new(0.8, 2, 0.15), CFrame = cf * CFrame.new(x + sx, y, -d / 2 - 0.15), Color = shutter, Material = M.Wood })
+			end
+		end
+	end
+
+	-- Gable roof
+	local top = floorY + h
+	local roofH = rng:NextNumber(3.5, 4.8)
+	for _, side in { -1, 1 } do
+		local roofCF = cf * CFrame.new(0, top + roofH / 2, side * (d / 4 + 0.4)) * CFrame.Angles(0, if side == 1 then math.pi else 0, 0)
+		newPart(m, { ClassName = "WedgePart", Name = "Roof", Size = Vector3.new(w + 1.6, roofH, d / 2 + 0.9), CFrame = roofCF, Color = style.Roof, Material = style.RoofMat })
+		if style.Snow then
+			newPart(m, { ClassName = "WedgePart", Name = "Snow", Size = Vector3.new(w + 1.7, roofH * 0.25, d / 2 + 1), CFrame = roofCF * CFrame.new(0, roofH * 0.42, -0.1), Color = Palette.Snow })
+		end
+	end
+	if style.Chimney then
+		local chimney = vcyl(m, "Chimney", (cf * CFrame.new(w / 4, top + roofH * 0.7, d / 6)).Position, roofH + 1, 1.4, style.Base or Palette.Stone, { Material = M.Brick })
+		local smoke = Instance.new("ParticleEmitter")
+		smoke.Texture = "rbxasset://textures/particles/smoke_main.dds"
+		smoke.Color = ColorSequence.new(Color3.fromRGB(200, 200, 200))
+		smoke.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.8), NumberSequenceKeypoint.new(1, 3) })
+		smoke.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.6), NumberSequenceKeypoint.new(1, 1) })
+		smoke.Lifetime = NumberRange.new(3, 4)
+		smoke.Rate = 2
+		smoke.Speed = NumberRange.new(2, 3)
+		smoke.EmissionDirection = Enum.NormalId.Right -- the cylinder's local X points up
+		smoke.Parent = chimney
+	end
+	return m
+end
+
+-- Ground is flat enough for a house of this footprint?
+local function flatEnough(cf: CFrame, w: number, d: number): (boolean, number)
+	local lowest, highest = math.huge, -math.huge
+	for _, x in { -w / 2, w / 2 } do
+		for _, z in { -d / 2, d / 2 } do
+			local p = (cf * CFrame.new(x, 0, z)).Position
+			local y = groundAt(p.X, p.Z)
+			lowest, highest = math.min(lowest, y), math.max(highest, y)
+		end
+	end
+	return highest - lowest < 4.5 and lowest > 2, lowest
+end
+
+local VILLAGER_NAMES = { "Ada", "Bram", "Cora", "Dov", "Elsie", "Finn", "Greta", "Hugo", "Iris", "Jory", "Kai", "Lena", "Milo", "Nell", "Otto", "Pia" }
+local villagers = {}
+
+local function makeVillage(folder, def, rng: Random, plaza: Vector3, block)
+	local village = Instance.new("Folder")
+	village.Name = "Village"
+	village.Parent = folder
+	local py = groundAt(plaza.X, plaza.Z)
+	local centre = Vector3.new(plaza.X, py, plaza.Z)
+
+	-- Plaza with a well, lamps and market clutter
+	local square = newModel(village, "Plaza", false)
+	newPart(square, {
+		Name = "Paving",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(1, 22, 22),
+		CFrame = CFrame.new(centre + Vector3.new(0, 0.1, 0)) * VERTICAL,
+		Color = Palette.Stone,
+		Material = M.Cobblestone,
+	})
+	local well = newModel(village, "Well")
+	vcyl(well, "Ring", centre + Vector3.new(0, 1.4, 0), 2.6, 4.4, Palette.Stone, { Material = M.Cobblestone })
+	vcyl(well, "Water", centre + Vector3.new(0, 2.4, 0), 0.3, 3.4, Palette.Water, { Material = M.Glass, Transparency = 0.3 })
+	for _, x in { -1.9, 1.9 } do
+		newPart(well, { Name = "Post", Size = Vector3.new(0.4, 5, 0.4), CFrame = CFrame.new(centre + Vector3.new(x, 3.2, 0)), Color = Palette.WoodDark })
+	end
+	for _, side in { -1, 1 } do
+		newPart(well, {
+			ClassName = "WedgePart",
+			Name = "Roof",
+			Size = Vector3.new(5, 1.4, 2),
+			CFrame = CFrame.new(centre + Vector3.new(0, 6.3, side * 1)) * CFrame.Angles(0, if side == 1 then math.pi else 0, 0),
+			Color = Palette.RoofTile,
+		})
+	end
+	for i = 1, 2 do
+		local a = i * math.pi + 0.6
+		local p = centre + Vector3.new(math.cos(a), 0, math.sin(a)) * 9
+		vcyl(square, "LampPost", p + Vector3.new(0, 3, 0), 6, 0.4, Palette.Ink)
+		local lamp = newPart(square, { Name = "Lamp", Size = Vector3.new(1, 1.2, 1), CFrame = CFrame.new(p + Vector3.new(0, 6.5, 0)), Color = Palette.Lamp, Material = M.Neon })
+		local light = Instance.new("PointLight")
+		light.Range = 26
+		light.Brightness = 1
+		light.Color = Palette.Lamp
+		light.Parent = lamp
+	end
+	for i = 1, 4 do
+		local a = rng:NextNumber(0, math.pi * 2)
+		local p = centre + Vector3.new(math.cos(a), 0, math.sin(a)) * rng:NextNumber(5, 9)
+		vcyl(square, "Barrel", p + Vector3.new(0, 1, 0), 2, 1.6, Palette.Wood, { Material = M.Wood })
+	end
+	block(centre, 13)
+
+	-- Houses in a ring around the plaza, doors facing the well
+	local doors = {}
+	local houses = if def.Home then 6 else 5
+	local placed = 0
+	for attempt = 1, 40 do
+		if placed >= houses then
+			break
+		end
+		local a = (attempt / 40) * math.pi * 2 * 3 + rng:NextNumber(-0.2, 0.2)
+		local r = rng:NextNumber(19, 30)
+		local pos = centre + Vector3.new(math.cos(a), 0, math.sin(a)) * r
+		local free = true
+		for _, b in block() do
+			if (Vector3.new(b[1].X, 0, b[1].Z) - Vector3.new(pos.X, 0, pos.Z)).Magnitude < b[2] + 7 then
+				free = false
+				break
+			end
+		end
+		if free then
+			local flatPos = Vector3.new(pos.X, centre.Y, pos.Z)
+			local cf = CFrame.lookAt(flatPos, Vector3.new(centre.X, centre.Y, centre.Z))
+			local ok, lowest = flatEnough(cf, 12, 10)
+			if ok then
+				local houseCF = CFrame.lookAt(Vector3.new(pos.X, lowest - 0.3, pos.Z), Vector3.new(centre.X, lowest - 0.3, centre.Z))
+				makeHouse(village, houseCF, def.Village, rng)
+				block(pos, 9)
+				placed += 1
+				table.insert(doors, (houseCF * CFrame.new(0, 0, -8)).Position)
+			end
+		end
+	end
+
+	-- A local shipwright on every island except Port Haven (which has Bosun Bertha)
+	if not def.Home then
+		local a = rng:NextNumber(0, math.pi * 2)
+		local pos = centre + Vector3.new(math.cos(a), 0, math.sin(a)) * 12
+		local y = groundAt(pos.X, pos.Z)
+		local feet = Vector3.new(pos.X, y, pos.Z)
+		local npc, torso = makeNPC(village, `{VILLAGER_NAMES[rng:NextInteger(1, #VILLAGER_NAMES)]} the Shipwright`, "🔨 Shipwright", CFrame.lookAt(feet, Vector3.new(centre.X, y, centre.Z)), Palette.Orange, Palette.WoodDark)
+		addPrompt(torso, "Shop", "Shipwright")
+		CollectionService:AddTag(npc, "Shipwright")
+		newPart(village, { Name = "Workbench", Size = Vector3.new(4, 2.6, 2), CFrame = CFrame.lookAt(feet, Vector3.new(centre.X, y, centre.Z)) * CFrame.new(0, 1.3, -2.5), Color = Palette.Wood })
+	end
+
+	-- Villagers wander between the well and their front doors
+	for i = 1, 3 do
+		if #doors == 0 then
+			break
+		end
+		local shirt = SHUTTERS[rng:NextInteger(1, #SHUTTERS)]
+		local hat = Palette.Cream
+		local name = VILLAGER_NAMES[rng:NextInteger(1, #VILLAGER_NAMES)]
+		local start = doors[(i - 1) % #doors + 1]
+		local npc = makeNPC(village, name, "🏡 Villager", CFrame.new(start), shirt, hat)
+		local offset = CFrame.new(start):ToObjectSpace(npc:GetPivot())
+		local points = { centre + Vector3.new(rng:NextNumber(-6, 6), 0, rng:NextNumber(-6, 6)) }
+		for _, door in doors do
+			table.insert(points, door)
+		end
+		table.insert(villagers, { Model = npc, Offset = offset, Points = points, From = start, To = points[1], T = 0, Wait = 0 })
+	end
+end
+
+local function startVillagers()
+	local SPEED = 4
+	task.spawn(function()
+		while true do
+			local dt = task.wait(0.1)
+			for _, v in villagers do
+				if v.Wait > 0 then
+					v.Wait -= dt
+				else
+					local distance = (v.To - v.From).Magnitude
+					v.T = math.min(1, v.T + dt * SPEED / math.max(distance, 1))
+					local pos = v.From:Lerp(v.To, v.T)
+					pos = Vector3.new(pos.X, pos.Y + math.abs(math.sin(os.clock() * 8)) * 0.15, pos.Z)
+					local look = Vector3.new(v.To.X - v.From.X, 0, v.To.Z - v.From.Z)
+					local facing = if look.Magnitude > 0.1 then CFrame.lookAt(pos, pos + look) else CFrame.new(pos)
+					v.Model:PivotTo(facing * v.Offset)
+					if v.T >= 1 then
+						v.From = v.To
+						v.To = v.Points[math.random(1, #v.Points)]
+						v.T = 0
+						v.Wait = math.random(2, 6)
+					end
+				end
+			end
+		end
+	end)
+end
+
+-- Rings of buoys at the zone borders, with signs saying what the next zone needs
+local function makeZoneMarkers()
+	local folder = Instance.new("Folder")
+	folder.Name = "ZoneMarkers"
+	folder.Parent = worldFolder
+	local home = Islands.Get("PortHaven").Position
+	local signs = {
+		[1] = "Open Sea ahead — needs a sailing ship (sail, keel, 10+ hull, 7+ long)",
+		[2] = "Far Reaches ahead — needs steam & iron (engine, 4 iron plates, 2 keels, 16+ hull, 9+ long)",
+	}
+	for index = 1, #Zones.Defs - 1 do
+		local radius = Zones.Get(index).Outer
+		local count = math.floor(2 * math.pi * radius / 170)
+		for i = 0, count - 1 do
+			local a = i / count * math.pi * 2
+			local pos = home + Vector3.new(math.cos(a), 0, math.sin(a)) * radius
+			if not Islands.IsSafe(pos) and groundAt(pos.X, pos.Z) < -10 then
+				local buoy = makeBuoy(folder, pos, if index == 1 then Palette.Orange else Palette.Purple, false)
+				if i % 4 == 0 then
+					local sign = newPart(buoy, { Name = "Sign", Size = Vector3.new(1, 1, 1), CFrame = CFrame.new(pos + Vector3.new(0, 8, 0)), Transparency = 1, CanCollide = false })
+					comicBillboard(sign, `⚠️ {Zones.Get(index + 1).Name}`, signs[index], 0, 350)
+				end
+			end
+		end
+	end
+end
+
 local function buildIsland(def)
 	local rng = Random.new(#def.Id * 7919 + math.floor(def.Position.X))
 	local folder = Instance.new("Folder")
@@ -791,8 +1044,12 @@ local function buildIsland(def)
 	local _, pierStart, pierEnd = makePier(folder, def)
 
 	local blocked = {} -- { {pos, radius} }
-	local function block(pos: Vector3, radius: number)
-		table.insert(blocked, { pos, radius })
+	-- block(pos, radius) reserves space; block() returns the reserved list
+	local function block(pos: Vector3?, radius: number?)
+		if pos then
+			table.insert(blocked, { pos, radius })
+		end
+		return blocked
 	end
 	local function onGround(pos: Vector3): CFrame
 		local y = groundAt(pos.X, pos.Z)
@@ -814,16 +1071,6 @@ local function buildIsland(def)
 		local ly = groundAt(lighthousePos.X, lighthousePos.Z)
 		makeLighthouse(folder, Vector3.new(lighthousePos.X, ly - 1, lighthousePos.Z))
 		block(lighthousePos, 12)
-
-		local hutColors = { { Palette.Plaster, Palette.RoofTile }, { Palette.Cream, Palette.RoofTile }, { Palette.Plaster, Palette.WoodDark } }
-		local hutSpots = { Vector3.new(30, 0, -20), Vector3.new(-45, 0, 20), Vector3.new(12, 0, -48) }
-		for i, offset in hutSpots do
-			local pos = c + offset
-			local y = groundAt(pos.X, pos.Z)
-			local flat = Vector3.new(pos.X, y - 0.5, pos.Z)
-			makeHut(folder, CFrame.lookAt(flat, Vector3.new(c.X, flat.Y, c.Z + R)), hutColors[i][1], hutColors[i][2])
-			block(pos, 12)
-		end
 
 		local spawnPos = c + dir * (R - 44)
 		local sy = groundAt(spawnPos.X, spawnPos.Z)
@@ -857,6 +1104,33 @@ local function buildIsland(def)
 	else
 		makeBuoy(folder, pierEnd + right * 18 + dir * 6, Palette.Red)
 		makeBuoy(folder, pierEnd - right * 18 + dir * 6, Palette.Green)
+		-- Buoys mark the island's safe waters
+		local safe = Islands.SafeRadius(def)
+		for i = 0, 15 do
+			local a = i / 16 * math.pi * 2
+			local pos = c + Vector3.new(math.cos(a), 0, math.sin(a)) * safe
+			if groundAt(pos.X, pos.Z) < -8 then
+				makeBuoy(folder, pos, if i % 2 == 0 then Palette.Green else Palette.White, false)
+			end
+		end
+	end
+
+	-- Village on the island's high ground, between the pier and the hilltop
+	makeVillage(folder, def, rng, c + dir * (R * 0.12) + right * (R * 0.15), block)
+
+	if def.Biome == "Volcanic" then
+		local peak = c + Vector3.new(-R * 0.1, 0, -R * 0.15)
+		local smokePart = newPart(folder, { Name = "VolcanoSmoke", Size = Vector3.new(8, 1, 8), CFrame = CFrame.new(peak.X, groundAt(peak.X, peak.Z) + 2, peak.Z), Transparency = 1, CanCollide = false })
+		local smoke = Instance.new("ParticleEmitter")
+		smoke.Texture = "rbxasset://textures/particles/smoke_main.dds"
+		smoke.Color = ColorSequence.new(Color3.fromRGB(110, 104, 100), Color3.fromRGB(60, 58, 58))
+		smoke.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 8), NumberSequenceKeypoint.new(1, 30) })
+		smoke.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.4), NumberSequenceKeypoint.new(1, 1) })
+		smoke.Lifetime = NumberRange.new(8, 12)
+		smoke.Rate = 4
+		smoke.Speed = NumberRange.new(8, 12)
+		smoke.SpreadAngle = Vector2.new(15, 15)
+		smoke.Parent = smokePart
 	end
 
 	-- Resource nodes and decoration
@@ -1077,8 +1351,10 @@ function WorldBuilder.Build()
 		buildIsland(Islands.Defs[id])
 		task.wait()
 	end
+	makeZoneMarkers()
 	startDayCycle()
 	startSpinners()
+	startVillagers()
 end
 
 return WorldBuilder

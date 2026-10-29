@@ -3,6 +3,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Islands = require(Shared.Islands)
 local Items = require(Shared.Items)
 
 local UIKit = require(script.Parent.UIKit)
@@ -160,7 +161,8 @@ function InventoryPanel.Init(ctx)
 			local def = Items.Get(id)
 			if def.Recipe and not def.Hidden then
 				order += 1
-				local can = true
+				local locked = def.Tier > (data.Tier or 1)
+				local can = not locked
 				for need, n in def.Recipe do
 					if (data.Inventory[need] or 0) < n then
 						can = false
@@ -187,7 +189,9 @@ function InventoryPanel.Init(ctx)
 					Position = UDim2.fromOffset(62, 8),
 					Parent = card,
 				})
-				local info = Items.StatsText(id)
+				local info = if locked
+					then `🔒 {Items.TIER_NAMES[def.Tier]} era · discover {Islands.UnlockSource(def.Tier)}`
+					else Items.StatsText(id)
 				UIKit.Label({
 					Text = if info ~= "" then info else (def.Description or ""),
 					TextSize = 13,
@@ -243,7 +247,7 @@ function InventoryPanel.Init(ctx)
 						canFive = false
 					end
 				end
-				UIKit.SetEnabled(five, canFive)
+				UIKit.SetEnabled(five, canFive and not locked)
 			end
 		end
 	end

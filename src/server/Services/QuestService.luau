@@ -4,6 +4,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Islands = require(Shared.Islands)
 local Items = require(Shared.Items)
 local Quests = require(Shared.Quests)
 
@@ -47,6 +48,30 @@ local function rewardText(reward): string
 	return table.concat(parts, " + ")
 end
 
+-- First mooring at an island: remember it and unlock its technology tier
+function QuestService.Discover(player: Player, islandId: string)
+	local profile = S.DataService.Get(player)
+	local def = Islands.Get(islandId)
+	if not profile or not def or profile.Discovered[islandId] then
+		return
+	end
+	profile.Discovered[islandId] = true
+	S.StateService.Notify(player, `🗺️ Discovered {def.Name}!`, "good")
+	if def.Unlocks > profile.Tier then
+		profile.Tier = def.Unlocks
+		local names = {}
+		for _, id in Items.Order do
+			local item = Items.Get(id)
+			if item.Tier == def.Unlocks and not item.Hidden then
+				table.insert(names, `{item.Icon} {item.Name}`)
+			end
+		end
+		S.StateService.Notify(player, `🔓 {Items.TIER_NAMES[def.Unlocks]} era unlocked: {table.concat(names, ", ")}`, "gain")
+		QuestService.Fire(player, "Discover", tostring(profile.Tier))
+	end
+	S.StateService.Push(player)
+end
+
 function QuestService.Fire(player: Player?, event: string, item: string?, amount: number?)
 	if not player then
 		return
@@ -57,7 +82,15 @@ function QuestService.Fire(player: Player?, event: string, item: string?, amount
 	end
 	local quest = profile.Quest
 	local step = Quests.Get(quest.Step)
-	if not step or step.Event ~= event or (step.Item and step.Item ~= item) then
+	if not step or step.Event ~= event then
+		return
+	end
+	if event == "ShipTier" or event == "Discover" then
+		-- Numeric steps: reaching a higher number also counts
+		if (tonumber(item) or 0) < (tonumber(step.Item) or 0) then
+			return
+		end
+	elseif step.Item and step.Item ~= item then
 		return
 	end
 	quest.Progress += amount or 1

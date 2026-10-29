@@ -7,6 +7,7 @@ local ShipStats = {}
 
 function ShipStats.Compute(blueprint, crateCount: number)
 	local mass, buoyancy, thrust, turn, slots, hp, stability, cannons = 0, 0, Config.BASE_THRUST, 0, 0, 0, 0, 0
+	local ram = false
 	for _, entry in blueprint do
 		local def = Items.Get(entry.t)
 		local s = def and def.Stats
@@ -21,6 +22,9 @@ function ShipStats.Compute(blueprint, crateCount: number)
 		end
 		if entry.t == "Cannon" then
 			cannons += 1
+		end
+		if s and s.Ram then
+			ram = true
 		end
 	end
 
@@ -54,6 +58,7 @@ function ShipStats.Compute(blueprint, crateCount: number)
 		MaxHP = math.max(10, hp),
 		Stability = stability,
 		Cannons = cannons,
+		Ram = ram,
 		-- Root height above sea level: the hull's top row sits just above the waterline
 		FloatOffset = -0.6 - draft,
 	}

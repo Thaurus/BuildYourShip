@@ -11,9 +11,10 @@ Goods.Defs = {
 	Tools = { Name = "Tools", Icon = "🛠️", Price = 120, Color = Color3.fromRGB(110, 116, 126) },
 	Spices = { Name = "Spices", Icon = "🌶️", Price = 150, Color = Color3.fromRGB(170, 50, 40) },
 	Furs = { Name = "Furs", Icon = "🧣", Price = 180, Color = Color3.fromRGB(140, 110, 80) },
+	Oil = { Name = "Lamp Oil", Icon = "🛢️", Price = 230, Color = Color3.fromRGB(60, 56, 50) },
 }
 
-Goods.Order = { "Fish", "Fruit", "Pottery", "Coffee", "Tools", "Spices", "Furs" }
+Goods.Order = { "Fish", "Fruit", "Pottery", "Coffee", "Tools", "Spices", "Furs", "Oil" }
 
 -- Price multiplier when an island buys a good it does not specifically want
 Goods.NEUTRAL_SELL_FACTOR = 0.5

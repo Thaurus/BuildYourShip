@@ -3,6 +3,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Islands = require(Shared.Islands)
 local Items = require(Shared.Items)
 local Remotes = require(Shared.Remotes)
 
@@ -54,7 +55,10 @@ function ShopPanel.Init(ctx)
 					Position = UDim2.fromOffset(58, 8),
 					Parent = card,
 				})
-				local info = Items.StatsText(id)
+				local locked = def.Tier > (data.Tier or 1)
+				local info = if locked
+					then `🔒 {Items.TIER_NAMES[def.Tier]} era · discover {Islands.UnlockSource(def.Tier)}`
+					else Items.StatsText(id)
 				UIKit.Label({
 					Text = if info ~= "" then info else (def.Description or ""),
 					TextSize = 13,
@@ -82,7 +86,7 @@ function ShopPanel.Init(ctx)
 							end
 						end,
 					})
-					UIKit.SetEnabled(button, data.Gold >= cost)
+					UIKit.SetEnabled(button, data.Gold >= cost and not locked)
 				end
 			end
 		end

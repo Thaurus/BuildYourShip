@@ -5,9 +5,18 @@ local Config = {}
 
 -- World
 Config.SEA_LEVEL = 0
-Config.OCEAN_SIZE = 3400 -- studs, square
+Config.OCEAN_SIZE = 4400 -- studs, square
 Config.OCEAN_DEPTH = 40
-Config.WORLD_RADIUS = 1450 -- ships are gently pushed back beyond this
+Config.WORLD_RADIUS = 2050 -- ships are gently pushed back beyond this
+
+-- Safe zones: no damage within this distance of any island's shore
+Config.ISLAND_SAFE_MARGIN = 150
+
+-- Ramming: an impact is a sudden loss of speed within one sample (0.1s)
+Config.RAM_MIN_DROP = 9 -- studs/s of speed lost
+Config.RAM_DAMAGE_PER_SPEED = 2 -- damage to the ship that was hit
+Config.RAM_SELF_DAMAGE = 1.2 -- damage to the rammer per stud/s above the threshold
+Config.RAM_BONUS = 3 -- multiplier for ships with a Ram bow
 
 -- Ship building grid
 Config.GRID = 4 -- studs per block cell
@@ -100,7 +109,7 @@ Config.DAY_CYCLE_ENABLED = true
 Config.DAY_LENGTH_MINUTES = 16
 
 -- Persistence
-Config.DATASTORE_NAME = "BuildYourShip_v2"
+Config.DATASTORE_NAME = "BuildYourShip_v3"
 Config.AUTOSAVE_INTERVAL = 120
 
 return Config

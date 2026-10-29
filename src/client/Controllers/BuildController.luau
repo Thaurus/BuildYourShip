@@ -66,9 +66,9 @@ function BuildController.Init(ctx)
 	-- Seaworthiness checklist: the ship can only launch when every line is green
 	local checklist = UIKit.Card({
 		Color = C.Paper,
-		Size = UDim2.fromOffset(330, 232),
+		Size = UDim2.fromOffset(340, 340),
 		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.new(0, 16, 1, -224),
+		Position = UDim2.new(0, 16, 1, -246),
 		Stroke = 3,
 		Parent = ctx.Screen,
 	})
@@ -87,7 +87,7 @@ function BuildController.Init(ctx)
 		TextSize = 14,
 		TextYAlignment = Enum.TextYAlignment.Top,
 		LineHeight = 1.25,
-		Size = UDim2.new(1, -24, 0, 140),
+		Size = UDim2.new(1, -24, 0, 248),
 		Position = UDim2.fromOffset(12, 36),
 		Parent = checklist,
 	})
@@ -110,6 +110,17 @@ function BuildController.Init(ctx)
 		local lines = {}
 		for _, rule in data.Vessel.Rules do
 			table.insert(lines, (if rule.Ok then "<font color=\"#3F7A3A\">✔</font>  " else "<font color=\"#A43A30\">✖</font>  ") .. rule.Text)
+		end
+		-- What the next sea zone asks for, so players know what to redesign
+		if data.NextZone then
+			table.insert(lines, "")
+			table.insert(lines, `<b>Next zone: {data.NextZone.Name}</b>`)
+			for _, rule in data.NextZone.Rules do
+				table.insert(lines, (if rule.Ok then "<font color=\"#3F7A3A\">✔</font>  " else "<font color=\"#A43A30\">✖</font>  ") .. rule.Text)
+			end
+		else
+			table.insert(lines, "")
+			table.insert(lines, "<b>Rated for every zone!</b>")
 		end
 		checkLabel.Text = table.concat(lines, "\n")
 		UIKit.SetEnabled(launchButton, data.Vessel.Ok)

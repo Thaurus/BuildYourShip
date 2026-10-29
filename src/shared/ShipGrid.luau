@@ -226,15 +226,15 @@ end
 
 export type Rule = { Id: string, Text: string, Ok: boolean }
 
-function ShipGrid.VesselCheck(blueprint): (boolean, { Rule })
-	local hasHelm, thrust = false, 0
+-- Shape numbers used by the vessel check and the zone ratings
+function ShipGrid.Metrics(blueprint)
+	local counts = {}
 	local waterline = {}
 	local byCell = {}
+	local thrust = 0
 	for _, e in blueprint do
 		local def = Items.Get(e.t)
-		if e.t == "Helm" then
-			hasHelm = true
-		end
+		counts[e.t] = (counts[e.t] or 0) + 1
 		if def.Stats and def.Stats.Thrust then
 			thrust += def.Stats.Thrust
 		end
@@ -245,16 +245,19 @@ function ShipGrid.VesselCheck(blueprint): (boolean, { Rule })
 	end
 
 	local minX, maxX, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
+	local metal = 0
 	for _, e in waterline do
 		minX, maxX = math.min(minX, e.x), math.max(maxX, e.x)
 		minZ, maxZ = math.min(minZ, e.z), math.max(maxZ, e.z)
+		if Items.MetalHulls[e.t] then
+			metal += 1
+		end
 	end
 
-	local bowOk = #waterline > 0
-	local bowCentre = false
+	local bowOk, bowCentre = #waterline > 0, false
 	for _, e in waterline do
 		if e.z == minZ then
-			if e.t ~= "Bow" then
+			if not Items.Bows[e.t] then
 				bowOk = false
 			elseif e.x == 0 then
 				bowCentre = true
@@ -262,24 +265,46 @@ function ShipGrid.VesselCheck(blueprint): (boolean, { Rule })
 		end
 	end
 
-	local length = if #waterline > 0 then maxZ - minZ + 1 else 0
-	local width = if #waterline > 0 then maxX - minX + 1 else 0
-
 	local mirrored = 0
 	for _, e in blueprint do
 		if e.x == 0 or byCell[ShipGrid.Key(-e.x, e.y, e.z)] == e.t then
 			mirrored += 1
 		end
 	end
-	local symmetry = if #blueprint > 0 then mirrored / #blueprint else 0
 
+	local function count(set)
+		local n = 0
+		for id in set do
+			n += counts[id] or 0
+		end
+		return n
+	end
+
+	return {
+		Counts = counts,
+		Thrust = thrust,
+		Waterline = #waterline,
+		MetalWaterline = metal,
+		Length = if #waterline > 0 then maxZ - minZ + 1 else 0,
+		Width = if #waterline > 0 then maxX - minX + 1 else 0,
+		BowOk = bowOk and bowCentre,
+		Symmetry = if #blueprint > 0 then mirrored / #blueprint else 0,
+		Sails = count(Items.Sails),
+		Engines = count(Items.Engines),
+		Keels = counts.Keel or 0,
+		HasHelm = (counts.Helm or 0) > 0,
+	}
+end
+
+function ShipGrid.VesselCheck(blueprint): (boolean, { Rule })
+	local m = ShipGrid.Metrics(blueprint)
 	local rules: { Rule } = {
-		{ Id = "helm", Text = "Has a helm", Ok = hasHelm },
-		{ Id = "propulsion", Text = "Has a sail or engine", Ok = thrust > 0 },
-		{ Id = "hull", Text = `Waterline hull of 6+ blocks ({#waterline})`, Ok = #waterline >= 6 },
-		{ Id = "bow", Text = "Front row is all Bow blocks, one in the centre", Ok = bowOk and bowCentre },
-		{ Id = "length", Text = `Longer than wide (+2): {length} x {width}`, Ok = length >= width + 2 },
-		{ Id = "symmetry", Text = `Left and right match ({math.floor(symmetry * 100)}% / 80%)`, Ok = symmetry >= 0.8 },
+		{ Id = "helm", Text = "Has a helm", Ok = m.HasHelm },
+		{ Id = "propulsion", Text = "Has oars, a sail or an engine", Ok = m.Thrust > 0 },
+		{ Id = "hull", Text = `Waterline hull of 6+ blocks ({m.Waterline})`, Ok = m.Waterline >= 6 },
+		{ Id = "bow", Text = "Front row is all Bow/Ram blocks, one in the centre", Ok = m.BowOk },
+		{ Id = "length", Text = `Longer than wide (+2): {m.Length} x {m.Width}`, Ok = m.Length >= m.Width + 2 },
+		{ Id = "symmetry", Text = `Left and right match ({math.floor(m.Symmetry * 100)}% / 80%)`, Ok = m.Symmetry >= 0.8 },
 	}
 	local ok = true
 	for _, rule in rules do
@@ -290,6 +315,7 @@ end
 
 --------------------------------------------------------------------------------
 
+-- Everyone starts with a little rowing boat
 function ShipGrid.StarterBlueprint()
 	local bp = {}
 	local function add(t, x, y, z, r)
@@ -297,18 +323,17 @@ function ShipGrid.StarterBlueprint()
 	end
 	for x = -1, 1 do
 		add("Bow", x, 0, -2)
-		for z = -1, 2 do
+		for z = -1, 1 do
 			add("WoodHull", x, 0, z)
 		end
 	end
-	add("Stern", 0, 0, 3)
-	add("Rudder", 0, 0, 4)
-	add("Keel", 0, -1, 0)
-	add("Helm", 0, 1, 2)
-	add("SmallSail", 0, 1, -1)
-	add("CargoHold", -1, 1, 0)
-	add("CargoHold", 1, 1, 0)
-	add("Flag", 0, 1, 3)
+	add("Stern", 0, 0, 2)
+	add("Rudder", 0, 0, 3)
+	add("Helm", 0, 1, 1)
+	add("Oars", -1, 1, 0, 1)
+	add("Oars", 1, 1, 0, 3)
+	add("CargoHold", 0, 1, -1)
+	add("Flag", 0, 1, 2)
 	return bp
 end
 

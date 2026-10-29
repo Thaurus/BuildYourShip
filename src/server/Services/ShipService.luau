@@ -8,6 +8,9 @@
 --   AlignOrientation                   heading plus roll/pitch sway
 -- The captain sits in the Helm's VehicleSeat and reports throttle/steer.
 --
+-- Sea zones (Shared/Zones) push back ships that aren't rated for them, and
+-- sudden impacts count as ramming / running aground.
+--
 -- There are no fixed berths. Ships moor at any free spot in Port Haven's
 -- harbour, and building happens in a private drydock that is generated on
 -- demand far away from the ocean, so any number of players fits.
@@ -27,6 +30,7 @@ local Palette = require(Shared.Palette)
 local Remotes = require(Shared.Remotes)
 local ShipGrid = require(Shared.ShipGrid)
 local ShipStats = require(Shared.ShipStats)
+local Zones = require(Shared.Zones)
 
 local ShipService = {}
 local S -- all services
@@ -137,6 +141,7 @@ end
 
 local function computeStats(ship)
 	ship.Stats = ShipStats.Compute(ship.Blueprint, ShipService.CrateCount(ship))
+	ship.Stats.Rating = Zones.Rating(ship.Blueprint)
 	ship.HP = math.min(ship.HP or ship.Stats.MaxHP, ship.Stats.MaxHP)
 end
 
@@ -736,6 +741,7 @@ local function launch(ship)
 		teleport(player, ship.Seat.CFrame + Vector3.new(0, 4, 3))
 	end
 	S.QuestService.Fire(player, "Launch")
+	S.QuestService.Fire(player, "ShipTier", tostring(ship.Stats.Rating))
 	pushCrew(ship)
 	local warning = if ship.Stats.Overloaded then " ...but she's too heavy and barely floats!" else ""
 	return success("⛵ Launched into Port Haven harbour!" .. warning)
@@ -920,6 +926,68 @@ local function moveToward(current: number, target: number, step: number): number
 	return math.max(current - step, target)
 end
 
+local function frontOffset(ship): (number, number)
+	local minZ, minX, maxX = 0, 0, 0
+	for _, entry in ship.Blueprint do
+		if entry.y >= 0 then
+			minZ = math.min(minZ, entry.z)
+			minX, maxX = math.min(minX, entry.x), math.max(maxX, entry.x)
+		end
+	end
+	return (minZ - 0.5) * Config.GRID, (maxX - minX + 1) * Config.GRID
+end
+
+-- A sudden loss of speed means we hit something: another ship, an island or rocks
+local function checkImpact(ship)
+	local now = os.clock()
+	if now - (ship.LastSample or 0) < 0.1 then
+		return
+	end
+	ship.LastSample = now
+	local v = ship.Root.AssemblyLinearVelocity
+	local speed = Vector3.new(v.X, 0, v.Z).Magnitude
+	local previous = ship.SampledSpeed or speed
+	ship.SampledSpeed = speed
+	local drop = previous - speed
+	if drop < Config.RAM_MIN_DROP or previous < 12 or now - (ship.LastImpact or 0) < 1.2 then
+		return
+	end
+	ship.LastImpact = now
+
+	local front, width = frontOffset(ship)
+	local probe = ship.Root.CFrame * CFrame.new(0, 0, front - 2)
+	local params = OverlapParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { ship.Model }
+	local target
+	for _, part in Workspace:GetPartBoundsInBox(probe, Vector3.new(width + 6, 12, 10), params) do
+		local other = ShipService.FromInstance(part)
+		if other and other ~= ship and not other.Sinking then
+			target = other
+			break
+		end
+	end
+
+	local ram = ship.Stats.Ram
+	if target then
+		local damage = drop * Config.RAM_DAMAGE_PER_SPEED * (if ram then Config.RAM_BONUS else 1)
+		ShipService.Damage(target, damage, ship.Captain, ship)
+		target.Speed *= 0.4
+		if ship.Captain then
+			S.StateService.Notify(ship.Captain, `💥 Rammed {target.Name}! (-{math.floor(damage)} HP)`, "good")
+		end
+		if target.Captain then
+			S.StateService.Notify(target.Captain, `💥 You've been rammed by {ship.Name}!`, "bad")
+		end
+	elseif ship.Captain then
+		S.StateService.Notify(ship.Captain, "💥 Ran aground!", "bad")
+	end
+	local selfDamage = (drop - Config.RAM_MIN_DROP + 3) * Config.RAM_SELF_DAMAGE * (if ram then 0.35 else 1)
+	ShipService.Damage(ship, selfDamage, if target then target.Captain else nil, target)
+	ship.Speed *= 0.3
+	S.CombatService.Effect("Crash", probe.Position, math.clamp(drop / 20, 0.6, 2))
+end
+
 local function stepShip(ship, dt: number, t: number)
 	if ship.Building or not ship.Root or not ship.Root.Parent or ship.Root.Anchored then
 		return
@@ -971,10 +1039,37 @@ local function stepShip(ship, dt: number, t: number)
 	if distance > Config.WORLD_RADIUS then
 		velocity -= flat.Unit * (distance - Config.WORLD_RADIUS + 10)
 	end
+
+	-- Zones the ship isn't built for push it back towards calmer water
+	local zoneIndex = Zones.At(pos)
+	local pushed = distance > Config.WORLD_RADIUS
+	if zoneIndex > stats.Rating and distance > 1 then
+		pushed = true
+		local limit = Zones.Get(stats.Rating).Outer
+		velocity -= flat.Unit * ((distance - limit) * 0.8 + 14)
+		if ship.Captain and os.clock() - (ship.LastZoneWarning or 0) > 6 then
+			ship.LastZoneWarning = os.clock()
+			local _, rules = Zones.Check(ship.Blueprint, stats.Rating + 1)
+			local missing = {}
+			for _, rule in rules do
+				if not rule.Ok then
+					table.insert(missing, rule.Text)
+				end
+			end
+			S.StateService.Notify(ship.Captain, `🌊 The {Zones.Get(stats.Rating + 1).Name} is too rough for this ship! Needs: {table.concat(missing, ", ")}`, "bad")
+		end
+	end
 	ship.LinearVelocity.PlaneVelocity = Vector2.new(velocity.X, velocity.Z)
+	if pushed then
+		-- The push itself changes speed; don't mistake it (or the settling after it) for a crash
+		ship.SampledSpeed = nil
+		ship.LastImpact = os.clock()
+	else
+		checkImpact(ship)
+	end
 
 	local calm = 1 / (1 + stats.Stability * 0.5)
-	local swell = 1 + storm * 4 * calm
+	local swell = (1 + storm * 4 * calm) * Zones.Get(zoneIndex).Swell * (0.6 + 0.4 * calm)
 	local bob = math.sin(t * 1.1 + ship.Phase) * 0.35 * swell
 	ship.AlignPosition.Position = Vector3.new(0, Config.SEA_LEVEL + stats.FloatOffset + bob, 0)
 
@@ -995,11 +1090,30 @@ local function slowUpdate()
 				if docked and not ship.Building then
 					S.StateService.Notify(ship.Captain, `⚓ Moored at {Islands.Get(docked).Name}`, "info")
 					S.QuestService.Fire(ship.Captain, "Dock", docked)
+					-- Everyone aboard discovers the island
+					for _, member in S.CrewService.Members(ship.Captain) do
+						local r = rootPart(member)
+						if r and (r.Position - ship.Root.Position).Magnitude < 120 then
+							S.QuestService.Discover(member, docked)
+							if member ~= ship.Captain then
+								S.QuestService.Fire(member, "Dock", docked)
+							end
+						end
+					end
+				end
+				pushCrew(ship)
+			end
+			-- Zone changes update the HUD
+			local zone = Zones.At(ship.Root.Position)
+			if zone ~= ship.Zone then
+				ship.Zone = zone
+				if not ship.Building and ship.Captain and zone > 1 then
+					S.StateService.Notify(ship.Captain, `🧭 Entering the {Zones.Get(zone).Name}`, "info")
 				end
 				pushCrew(ship)
 			end
 			-- Free repairs in the safe harbour
-			if not ship.Building and not ship.Sinking and Islands.IsSafe(ship.Root.Position) and ship.HP < ship.Stats.MaxHP then
+			if not ship.Building and not ship.Sinking and ship.DockedAt == "PortHaven" and ship.HP < ship.Stats.MaxHP then
 				ShipService.Repair(ship, Config.HARBOUR_REPAIR_RATE * 0.5)
 			end
 			-- Anyone who falls into the drydock basin climbs back out

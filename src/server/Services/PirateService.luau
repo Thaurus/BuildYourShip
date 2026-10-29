@@ -1,7 +1,8 @@
 -- NPC pirate ships. They patrol the open sea, hunt nearby player ships,
 -- turn to bring their broadside to bear and fire. Sinking one pays a bounty
 -- to everyone who damaged it and spills its loot crates into the water.
--- Pirates never enter Port Haven's harbour.
+-- Pirates never enter safe waters around islands and never sail in the
+-- Sheltered Bay; the Far Reaches have armoured ironclads.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -10,6 +11,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Goods = require(Shared.Goods)
 local Islands = require(Shared.Islands)
+local Zones = require(Shared.Zones)
 
 local PirateService = {}
 local S
@@ -55,9 +57,41 @@ local function sloop()
 	return bp
 end
 
-local function lootHolds()
+-- Armoured steam pirate for the Far Reaches
+local function ironclad()
+	local bp = {}
+	local function add(t, x, y, z, r)
+		table.insert(bp, { t = t, x = x, y = y, z = z, r = r or 0 })
+	end
+	for x = -1, 1 do
+		add(if x == 0 then "Ram" else "Bow", x, 0, -4)
+		for z = -3, 3 do
+			add("IronHull", x, 0, z)
+		end
+	end
+	add("IronHull", -1, 0, 4)
+	add("IronHull", 1, 0, 4)
+	add("Stern", 0, 0, 4)
+	add("Rudder", 0, 0, 5)
+	for z = -2, 2 do
+		add("Keel", 0, -1, z)
+	end
+	add("Helm", 0, 1, 4)
+	add("SteamEngine", 0, 1, 2)
+	add("LargeSail", 0, 1, -1)
+	for _, z in { -3, -1, 1 } do
+		add("Cannon", -1, 1, z, 1)
+		add("Cannon", 1, 1, z, 3)
+	end
+	add("CargoHold", -1, 1, 3)
+	add("CargoHold", 1, 1, 3)
+	add("Flag", 0, 1, -4)
+	return bp
+end
+
+local function lootHolds(keys)
 	local holds = {}
-	for _, key in { "-1,1,2", "1,1,2" } do
+	for _, key in keys do
 		local list = {}
 		for _ = 1, rng:NextInteger(1, 2) do
 			table.insert(list, Goods.Order[rng:NextInteger(3, #Goods.Order)])
@@ -77,10 +111,12 @@ local function isClearOfLand(pos: Vector3, margin: number): boolean
 	return not Islands.IsSafe(pos)
 end
 
-local function randomSeaPoint(minFromPlayers: number): Vector3?
+local function randomSeaPoint(minFromPlayers: number, zone: number): Vector3?
+	local inner = Zones.Get(zone - 1).Outer + 120
+	local outer = math.min(Zones.Get(zone).Outer, Config.WORLD_RADIUS) - 120
 	for _ = 1, 40 do
 		local a = rng:NextNumber(0, math.pi * 2)
-		local r = rng:NextNumber(450, Config.WORLD_RADIUS - 150)
+		local r = rng:NextNumber(inner, outer)
 		local pos = Vector3.new(math.cos(a) * r, Config.SEA_LEVEL, math.sin(a) * r)
 		local ok = isClearOfLand(pos, 220)
 		if ok and minFromPlayers > 0 then
@@ -99,17 +135,20 @@ local function randomSeaPoint(minFromPlayers: number): Vector3?
 end
 
 local function spawnPirate()
-	local pos = randomSeaPoint(450)
+	local zone = if rng:NextNumber() < 0.65 then 2 else 3
+	local pos = randomSeaPoint(450, zone)
 	if not pos then
 		return
 	end
 	local cf = CFrame.lookAt(pos, pos + Vector3.new(rng:NextNumber(-1, 1), 0, rng:NextNumber(-1, 1)))
-	local ship = S.ShipService.SpawnNPC(sloop(), cf, {
-		Name = NAMES[rng:NextInteger(1, #NAMES)],
+	local armoured = zone == 3
+	local ship = S.ShipService.SpawnNPC(if armoured then ironclad() else sloop(), cf, {
+		Name = (if armoured then "⚙️ " else "") .. NAMES[rng:NextInteger(1, #NAMES)],
 		Style = "Pirate",
-		Holds = lootHolds(),
+		Holds = lootHolds(if armoured then { "-1,1,3", "1,1,3" } else { "-1,1,2", "1,1,2" }),
 	})
-	ship.Patrol = randomSeaPoint(0) or pos
+	ship.PirateZone = zone
+	ship.Patrol = randomSeaPoint(0, zone) or pos
 	pirates[ship] = true
 end
 
@@ -173,7 +212,7 @@ local function think(ship)
 	else
 		local toPatrol = Vector3.new(ship.Patrol.X - pos.X, 0, ship.Patrol.Z - pos.Z)
 		if toPatrol.Magnitude < 60 then
-			ship.Patrol = randomSeaPoint(0) or ship.Patrol
+			ship.Patrol = randomSeaPoint(0, ship.PirateZone) or ship.Patrol
 		end
 		desired = toPatrol.Unit
 		ship.AI.Throttle = 0.5
@@ -208,7 +247,8 @@ local function onSunk(ship)
 	end
 	for player, amount in ship.DamageBy do
 		if player.Parent == Players then
-			local share = math.max(10, math.floor(Config.PIRATE_REWARD * amount / math.max(total, 1)))
+			local bounty = Config.PIRATE_REWARD * (if ship.PirateZone == 3 then 3 else 1)
+			local share = math.max(10, math.floor(bounty * amount / math.max(total, 1)))
 			S.InventoryService.AddGold(player, share)
 			S.StateService.Notify(player, `☠️ Pirates sunk! Bounty: {share}g. Grab the floating loot!`, "good")
 			S.QuestService.Fire(player, "SinkPirate")

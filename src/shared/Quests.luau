@@ -10,10 +10,14 @@
 --             "dock:<IslandId>"      that island's pier
 --             "shipwright"           Bosun Bertha in Port Haven
 --             "ship"                 your own ship
+--
+-- "ShipTier" and "Discover" steps complete when the reported number is at
+-- least the step's Item (ship zone rating / unlocked technology tier).
 
 local Quests = {}
 
 Quests.Steps = {
+	-- Era 1: rowing in the Sheltered Bay ----------------------------------
 	{
 		Title = "Timber!",
 		Text = "Chop 4 Wood from trees (walk up and hold E).",
@@ -41,7 +45,7 @@ Quests.Steps = {
 	},
 	{
 		Title = "To the drydock",
-		Text = "Walk to your ship in Port Haven harbour and press B to open your drydock.",
+		Text = "Walk to your rowing boat in Port Haven harbour and press B to open your drydock.",
 		Event = "EnterBuild",
 		Count = 1,
 		Target = "ship",
@@ -56,7 +60,7 @@ Quests.Steps = {
 	},
 	{
 		Title = "Launch day",
-		Text = "Press B again to launch. The vessel check must be all green!",
+		Text = "Press B again to launch. The seaworthiness check must be all green!",
 		Event = "Launch",
 		Count = 1,
 		Reward = { Gold = 30 },
@@ -71,33 +75,61 @@ Quests.Steps = {
 	},
 	{
 		Title = "Stow it",
-		Text = "Pick up the crate, carry it aboard and stow it in a Cargo Crate (E).",
+		Text = "Pick up the crate, carry it aboard and stow it in the Cargo Crate (E).",
 		Event = "Stow",
 		Count = 1,
 		Target = "ship",
 		Reward = { Gold = 20 },
 	},
 	{
-		Title = "Take the helm",
-		Text = "Board your ship and take the helm (H).",
+		Title = "Row, row, row",
+		Text = "Board your boat and take the helm (H). W/S to row, A/D to steer.",
 		Event = "Helm",
 		Count = 1,
 		Target = "ship",
 	},
 	{
-		Title = "Set sail",
-		Text = "Sail to Ironrock and moor at its pier.",
+		Title = "Palm Cove",
+		Text = "Row across the bay to Palm Cove and moor at its pier. Islanders there know how to sail!",
+		Event = "Dock",
+		Item = "PalmCove",
+		Count = 1,
+		Target = "dock:PalmCove",
+		Reward = { Gold = 40 },
+	},
+	{
+		Title = "Turn a profit",
+		Text = "Carry your Fish crate to Kiki Coco and sell it.",
+		Event = "SellCrate",
+		Count = 1,
+		Target = "trader:PalmCove",
+		Reward = { Gold = 40 },
+	},
+	-- Era 2: sailing the Open Sea ------------------------------------------
+	{
+		Title = "Canvas and rope",
+		Text = "Sailing is unlocked! Craft or buy a Small Sail.",
+		Event = "Craft",
+		Item = "SmallSail",
+		Count = 1,
+		Reward = { Gold = 40 },
+	},
+	{
+		Title = "A real ship",
+		Text = "Redesign your boat for the Open Sea: a sail, a keel, 10+ waterline hull, 7+ long. Then launch.",
+		Event = "ShipTier",
+		Item = "2",
+		Count = 1,
+		Target = "ship",
+		Reward = { Gold = 100 },
+	},
+	{
+		Title = "Beyond the bay",
+		Text = "Sail out onto the Open Sea and moor at Ironrock.",
 		Event = "Dock",
 		Item = "Ironrock",
 		Count = 1,
 		Target = "dock:Ironrock",
-	},
-	{
-		Title = "Turn a profit",
-		Text = "Carry the Fish crate to Old Brannoc and sell it.",
-		Event = "SellCrate",
-		Count = 1,
-		Target = "trader:Ironrock",
 		Reward = { Gold = 60 },
 	},
 	{
@@ -128,24 +160,42 @@ Quests.Steps = {
 	},
 	{
 		Title = "Pirate hunter",
-		Text = "Sink a pirate ship. At sea, press F to fire a broadside where your camera looks.",
+		Text = "Sink a pirate ship on the Open Sea. Press F to fire a broadside where your camera looks.",
 		Event = "SinkPirate",
 		Count = 1,
 		Reward = { Gold = 200 },
 	},
 	{
 		Title = "Better together",
-		Text = "Invite a friend to your crew (Crew button). Crews share trade gold.",
+		Text = "Invite a friend to your crew (C). Crews share trade gold.",
 		Event = "CrewJoined",
 		Count = 1,
 		Reward = { Gold = 100 },
 	},
+	-- Era 3: steam and the Far Reaches -------------------------------------
+	{
+		Title = "Full steam ahead",
+		Text = "Steam is unlocked! Build a Far Reaches ship: engine, 4 iron waterline plates, 2 keels, 16+ hull, 9+ long.",
+		Event = "ShipTier",
+		Item = "3",
+		Count = 1,
+		Target = "ship",
+		Reward = { Gold = 300 },
+	},
+	{
+		Title = "Edge of the map",
+		Text = "Reach the Far Reaches and moor at Frostpeak or Cinder Isle.",
+		Event = "Discover",
+		Item = "4",
+		Count = 1,
+		Reward = { Gold = 300 },
+	},
 	{
 		Title = "Merchant prince",
-		Text = "Earn 2,000 gold from selling crates. Big ships, big profits!",
+		Text = "Earn 5,000 gold from selling crates. Diesel motors and steel hulls await!",
 		Event = "TradeGold",
-		Count = 2000,
-		Reward = { Gold = 500 },
+		Count = 5000,
+		Reward = { Gold = 1000 },
 	},
 }
 

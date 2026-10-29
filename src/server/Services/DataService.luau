@@ -35,6 +35,8 @@ local function defaultProfile()
 		Blueprint = ShipGrid.StarterBlueprint(),
 		Stats = { GoldEarned = 0, Trades = 0, Harvests = 0 },
 		Quest = { Step = 1, Progress = 0 },
+		Tier = 1, -- highest technology era unlocked
+		Discovered = { PortHaven = true }, -- islands this player has moored at
 		SeenTutorial = false,
 	}
 end
@@ -87,6 +89,16 @@ local function sanitize(raw)
 		end
 	end
 	profile.SeenTutorial = raw.SeenTutorial == true
+	if type(raw.Tier) == "number" then
+		profile.Tier = math.clamp(math.floor(raw.Tier), 1, 4)
+	end
+	if type(raw.Discovered) == "table" then
+		for id, value in raw.Discovered do
+			if type(id) == "string" and value == true then
+				profile.Discovered[id] = true
+			end
+		end
+	end
 	return profile
 end
 

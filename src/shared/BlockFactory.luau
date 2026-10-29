@@ -149,6 +149,27 @@ builders.Bow = function(m, opts, col)
 	end
 end
 
+builders.SteelHull = function(m)
+	addPart(m, "Main", Vector3.new(G, G, G), CFrame.new(), Color3.fromRGB(112, 122, 134), { Material = M.Metal, Reflectance = 0.06 })
+	addPart(m, "Boot", Vector3.new(G + 0.06, 1.1, G + 0.06), CFrame.new(0, -H + 0.55, 0), Palette.AntiFoul, { Decor = true, Material = M.Metal })
+	addPart(m, "Weld", Vector3.new(G + 0.08, 0.12, G + 0.08), CFrame.new(0, 0.4, 0), Palette.IronDark, { Decor = true, Material = M.Metal })
+	addPart(m, "Gunwale", Vector3.new(G + 0.1, 0.3, G + 0.1), CFrame.new(0, H - 0.15, 0), Palette.IronDark, { Decor = true, Material = M.DiamondPlate })
+end
+
+-- An iron-shod bow with a spike at the waterline
+builders.Ram = function(m, opts, col)
+	builders.Bow(m, opts, col)
+	addPart(m, "Plating", Vector3.new(G + 0.08, 1.6, G + 0.08), CFrame.new(0, -H + 0.8, 0), Palette.IronDark, { Decor = true, Material = M.Metal })
+	if (opts.X or 0) == 0 then
+		for _, side in { -1, 1 } do
+			wedge(m, "Spike", Vector3.new(1.4, 0.8, 3.2), CFrame.new(side * 0.4, -H + 0.9, -H - 3.6) * CFrame.Angles(0, 0, side * -math.pi / 2), Palette.Iron, {
+				Decor = true,
+				Material = M.Metal,
+			})
+		end
+	end
+end
+
 builders.Stern = function(m, opts, col)
 	addPart(m, "Main", Vector3.new(G, G, G), CFrame.new(), col.Hull, { Material = M.WoodPlanks })
 	hullBands(m, col)
@@ -267,6 +288,49 @@ builders.SteamEngine = function(m)
 	smoke.Rate = 6
 	smoke.Speed = NumberRange.new(4, 6)
 	smoke.SpreadAngle = Vector2.new(10, 10)
+	smoke.EmissionDirection = Enum.NormalId.Right
+	smoke.Parent = attachment
+end
+
+-- Rowing bench with an oar reaching over the side (the block's -Z faces outboard)
+builders.Oars = function(m, _opts, col)
+	addPart(m, "Main", Vector3.new(G - 0.6, 0.4, 1.2), CFrame.new(0, -H + 1.2, 0.6), Palette.WoodLight, { Material = M.WoodPlanks })
+	for _, x in { -1.4, 1.4 } do
+		addPart(m, "BenchLeg", Vector3.new(0.3, 1, 0.3), CFrame.new(x, -H + 0.5, 0.6), col.Trim, { Decor = true, Material = M.Wood })
+	end
+	addPart(m, "Oarlock", Vector3.new(0.5, 0.6, 0.5), CFrame.new(0, -H + 0.3, -H + 0.25), Palette.IronDark, { Decor = true, Material = M.Metal })
+	local handle = Vector3.new(0, -H + 1.6, 0.4)
+	local blade = Vector3.new(0, -H - 2.6, -H - 4.2)
+	addPart(m, "Oar", Vector3.new(0.25, 0.25, (blade - handle).Magnitude), CFrame.lookAt((handle + blade) / 2, blade), Palette.WoodLight, {
+		Decor = true,
+		Material = M.Wood,
+	})
+	addPart(m, "Blade", Vector3.new(0.12, 0.9, 1.8), CFrame.lookAt(blade, blade + (blade - handle).Unit), Palette.WoodLight, {
+		Decor = true,
+		Material = M.Wood,
+	})
+end
+
+builders.DieselMotor = function(m)
+	addPart(m, "Main", Vector3.new(G - 0.4, 2.4, G - 0.6), CFrame.new(0, -H + 1.2, 0.2), Color3.fromRGB(70, 86, 74), { Material = M.Metal })
+	addPart(m, "Head", Vector3.new(2.4, 0.8, 2.6), CFrame.new(0, -H + 2.8, 0.2), Palette.IronDark, { Material = M.DiamondPlate })
+	for i = -1, 1 do
+		addPart(m, "Fin", Vector3.new(2.6, 0.12, 0.12), CFrame.new(0, -H + 1.6, 0.2 + i * 0.7), Palette.Iron, { Decor = true, Material = M.Metal })
+	end
+	local exhaust = cylinder(m, "Exhaust", 3, 0.5, CFrame.new(1.2, -H + 4.2, 1.4), Palette.Ink, { Material = M.Metal })
+	local attachment = Instance.new("Attachment")
+	attachment.Name = "SmokeOrigin"
+	attachment.Position = Vector3.new(1.6, 0, 0)
+	attachment.Parent = exhaust
+	local smoke = Instance.new("ParticleEmitter")
+	smoke.Name = "Smoke"
+	smoke.Texture = "rbxasset://textures/particles/smoke_main.dds"
+	smoke.Color = ColorSequence.new(Color3.fromRGB(90, 90, 92))
+	smoke.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 2.5) })
+	smoke.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 1) })
+	smoke.Lifetime = NumberRange.new(1, 1.8)
+	smoke.Rate = 10
+	smoke.Speed = NumberRange.new(3, 5)
 	smoke.EmissionDirection = Enum.NormalId.Right
 	smoke.Parent = attachment
 end

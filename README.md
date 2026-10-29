@@ -26,6 +26,32 @@ All quests live in `src/shared/Quests.luau`.
 
 ## Systems
 
+### Sea zones and eras
+The sea is split into rings around Port Haven. Each needs a better ship, so
+progressing means redesigning:
+
+| Zone | Era | Your ship needs |
+| --- | --- | --- |
+| Sheltered Bay (start) | Rowing | anything seaworthy (you start with a rowing boat) |
+| Open Sea | Sailing | a sail, a keel, 10+ waterline hull, 7+ long |
+| Far Reaches | Steam | an engine, 4 iron/steel waterline plates, 2 keels, 16+ hull, 9+ long |
+
+A ship that isn't rated for a zone is pushed back by the rough water (and told
+what's missing). Rougher zones have bigger waves, storms and pirates (ironclads
+in the Far Reaches). Modern parts unlock as you **discover islands**:
+Palm Cove teaches sailing, Ironrock / Spice Atoll teach steam and iron,
+Frostpeak / Cinder Isle unlock diesel motors and steel hulls.
+
+### Villages, safe zones, ramming and sound
+- Every island has a village in its own style (harbour plaster, tropical stilt
+  huts, stone cottages, snowy log cabins, basalt houses), a plaza with a well,
+  walking villagers and a local shipwright who sells parts.
+- The waters around every island (and Port Haven's harbour) are safe zones.
+- Hitting another ship at speed rams it; hitting land runs you aground. The
+  **Ram** bow deals triple damage and protects you.
+- Sounds for cannons, explosions, splashes, crashes, thunder and rowing; slots
+  for ambience and music in `src/shared/SoundIds.luau`.
+
 ### Building: the virtual drydock
 - There are **no fixed berths**. Ships moor at any free spot in Port Haven's
   harbour (computed at runtime), so the world never needs changing for more players.
@@ -91,11 +117,12 @@ Create the passes on the Creator Dashboard and paste their IDs into
 
 | Island | Resources | Sells (cheap) | Wants (pays well) |
 | --- | --- | --- | --- |
-| 🏠 Port Haven | oak, palm, flax | 🐟 Fish, 🏺 Pottery | 🌶️ Spices, 🛠️ Tools, 🧣 Furs |
-| 🏝️ Palm Cove | palms, lots of flax | 🍍 Fruit, ☕ Coffee | 🏺 Pottery, 🛠️ Tools, 🐟 Fish |
-| ⛏️ Ironrock | pines, iron ore | 🛠️ Tools | 🐟 Fish, 🍍 Fruit, ☕ Coffee |
-| 🌶️ Spice Atoll | palms, flax | 🌶️ Spices | 🐟 Fish, 🛠️ Tools, 🏺 Pottery, 🧣 Furs |
-| ❄️ Frostpeak | snowy pines, iron ore | 🧣 Furs | 🌶️ Spices, ☕ Coffee, 🍍 Fruit |
+| 🏠 Port Haven (bay) | oak, palm, flax | 🐟 Fish, 🏺 Pottery | 🌶️ Spices, 🛠️ Tools, 🧣 Furs |
+| 🏝️ Palm Cove (bay) | palms, flax, a little iron | 🍍 Fruit, ☕ Coffee | 🏺 Pottery, 🛠️ Tools, 🐟 Fish |
+| ⛏️ Ironrock (open sea) | pines, iron ore | 🛠️ Tools | 🐟 Fish, 🍍 Fruit, ☕ Coffee |
+| 🌶️ Spice Atoll (open sea) | palms, flax | 🌶️ Spices | 🐟 Fish, 🛠️ Tools, 🏺 Pottery, 🧣 Furs |
+| ❄️ Frostpeak (far reaches) | snowy pines, iron ore | 🧣 Furs | 🌶️ Spices, ☕ Coffee, 🍍 Fruit, 🛢️ Oil |
+| 🌋 Cinder Isle (far reaches) | iron ore | 🛢️ Lamp Oil | 🧣 Furs, 🛠️ Tools, 🌶️ Spices, 🐟 Fish |
 
 ## Running it
 
@@ -128,6 +155,8 @@ src/
     Goods.luau            trade goods (one unit = one crate)
     Islands.luau          islands, markets, docks, safe harbour
     Quests.luau           the guided quest line
+    Zones.luau            sea zones and their ship requirements
+    SoundIds.luau         every sound id (paste Creator Store ids here)
     ShipGrid.luau         grid math, placement rules, vessel check
     ShipStats.luau        speed / float / crates / HP from a blueprint
     BlockFactory.luau     procedural models for every block and crate
@@ -148,6 +177,6 @@ src/
     DataService / InventoryService / StateService
   client/
     UI/                   UIKit, HUD, Inventory, Shop, Market, Crew, Store, Tutorial
-    Controllers/          Build, Helm, Prompt, Combat, Quest, Weather, Outline,
-                          Effects, Navigation
+    Controllers/          Build, Helm, Prompt, Combat, Quest, Weather, Sound, Zone,
+                          Outline, Effects, Navigation
 ```

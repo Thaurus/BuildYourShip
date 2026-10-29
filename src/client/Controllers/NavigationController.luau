@@ -7,6 +7,7 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Goods = require(Shared.Goods)
 local Islands = require(Shared.Islands)
+local Zones = require(Shared.Zones)
 local UIKit = require(script.Parent.Parent.UI.UIKit)
 local C = UIKit.Colors
 
@@ -98,7 +99,12 @@ function NavigationController.Init(ctx)
 			local d = (Vector3.new(marker.Def.Position.X, origin.Y, marker.Def.Position.Z) - origin).Magnitude
 			-- Hide the marker of the island you're standing on
 			marker.Gui.Enabled = d > marker.Def.Radius + 80
-			marker.Distance.Text = `{math.floor(d)} studs`
+			local data = ctx.State.Data
+			local rating = data and data.Ship and data.Ship.Stats and data.Ship.Stats.Rating or 1
+			local zone = marker.Def.Zone or 1
+			marker.Distance.Text = if zone > rating
+				then `{math.floor(d)} studs · 🔒 needs a {Zones.Get(zone).Era:lower()} ship`
+				else `{math.floor(d)} studs`
 		end
 	end)
 end

@@ -25,6 +25,8 @@ local PromptController = require(Client.Controllers.PromptController)
 local CombatController = require(Client.Controllers.CombatController)
 local QuestController = require(Client.Controllers.QuestController)
 local WeatherController = require(Client.Controllers.WeatherController)
+local SoundController = require(Client.Controllers.SoundController)
+local ZoneController = require(Client.Controllers.ZoneController)
 
 local screen = Instance.new("ScreenGui")
 screen.Name = "BuildYourShipUI"
@@ -57,6 +59,8 @@ PromptController.Init()
 CombatController.Init(ctx)
 QuestController.Init(ctx)
 WeatherController.Init(ctx)
+SoundController.Init(ctx)
+ZoneController.Init(ctx)
 
 UserInputService.InputBegan:Connect(function(input, processed)
 	if processed or UserInputService:GetFocusedTextBox() then

@@ -5,11 +5,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
+local Islands = require(Shared.Islands)
 local Items = require(Shared.Items)
 local Remotes = require(Shared.Remotes)
 
 local CraftingService = {}
-local InventoryService, StateService, QuestService, GamepassService
+local InventoryService, StateService, QuestService, GamepassService, DataService
 
 local MAX_BATCH = 50
 
@@ -18,6 +19,16 @@ function CraftingService.Init(services)
 	StateService = services.StateService
 	QuestService = services.QuestService
 	GamepassService = services.GamepassService
+	DataService = services.DataService
+end
+
+-- Parts from later eras must be discovered first
+local function tierLock(player: Player, def): string?
+	local profile = DataService.Get(player)
+	if profile and def.Tier > profile.Tier then
+		return `🔒 {def.Name} is {Items.TIER_NAMES[def.Tier]}-era tech. Discover {Islands.UnlockSource(def.Tier)} to unlock it.`
+	end
+	return nil
 end
 
 function CraftingService.PriceFor(player: Player, id: string): number
@@ -59,6 +70,10 @@ function CraftingService.Craft(player: Player, id: any, amount: any)
 	if not def or not def.Recipe or def.Hidden or not amount then
 		return { ok = false, msg = "You can't craft that." }
 	end
+	local locked = tierLock(player, def)
+	if locked then
+		return { ok = false, msg = locked }
+	end
 	if not InventoryService.ConsumeRecipe(player, def.Recipe, amount) then
 		return { ok = false, msg = "Not enough materials!" }
 	end
@@ -75,7 +90,11 @@ function CraftingService.Buy(player: Player, id: any, amount: any)
 		return { ok = false, msg = "Not for sale." }
 	end
 	if not nearShipwright(player) then
-		return { ok = false, msg = "Visit the Shipwright in Port Haven to shop." }
+		return { ok = false, msg = "Visit a shipwright (every village and drydock has one) to shop." }
+	end
+	local locked = tierLock(player, def)
+	if locked then
+		return { ok = false, msg = locked }
 	end
 	local cost = CraftingService.PriceFor(player, id) * amount
 	if not InventoryService.SpendGold(player, cost) then

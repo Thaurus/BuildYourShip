@@ -9,6 +9,8 @@ local TweenService = game:GetService("TweenService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Goods = require(Shared.Goods)
 local Islands = require(Shared.Islands)
+local Items = require(Shared.Items)
+local Zones = require(Shared.Zones)
 local Remotes = require(Shared.Remotes)
 
 local UIKit = require(script.Parent.UIKit)
@@ -103,7 +105,7 @@ function HUD.Init(ctx)
 	--------------------------------------------------------------------------
 	local card = UIKit.Card({
 		Color = C.Paper,
-		Size = UDim2.fromOffset(270, 196),
+		Size = UDim2.fromOffset(270, 218),
 		Position = UDim2.new(0, 16, 1, -16),
 		AnchorPoint = Vector2.new(0, 1),
 		Radius = 12,
@@ -146,6 +148,7 @@ function HUD.Init(ctx)
 	local loadRow = row(122)
 	local loadFill = bar(card, UDim2.fromOffset(12, 144), UDim2.new(1, -24, 0, 12))
 	local extraRow = row(162)
+	local zoneRow = row(184)
 
 	--------------------------------------------------------------------------
 	-- Action buttons
@@ -277,8 +280,9 @@ function HUD.Init(ctx)
 			locationLabel.Text = `⚓ Moored at {Islands.Get(ship.DockedAt).Name}`
 			location.BackgroundColor3 = C.Teal
 		else
-			locationLabel.Text = "🌊 Open sea · beware of pirates"
-			location.BackgroundColor3 = C.Blue
+			local zone = Zones.Get(data.Zone or 1)
+			locationLabel.Text = if data.Zone == 1 then `🌊 {zone.Name}` else `🌊 {zone.Name} · beware of pirates`
+			location.BackgroundColor3 = if data.Zone == 3 then C.Purple else C.Blue
 		end
 
 		-- Ship card
@@ -310,6 +314,8 @@ function HUD.Init(ctx)
 			loadFill.Size = UDim2.fromScale(math.clamp(stats.Load, 0.02, 1), 1)
 			loadFill.BackgroundColor3 = if stats.Load > 1 then C.Red elseif stats.Load > 0.8 then C.Orange else C.Green
 			extraRow.Text = `💣 Cannons <b>{stats.Cannons}</b>   🧱 Blocks <b>{stats.Blocks}</b>   ⚫ <b>{data.Inventory.Cannonball or 0}</b>`
+			local rating = stats.Rating or 1
+			zoneRow.Text = `🧭 Rated for <b>{Zones.Get(rating).Name}</b> · era <b>{Items.TIER_NAMES[data.Tier or 1]}</b>`
 		end
 
 		-- Context hint

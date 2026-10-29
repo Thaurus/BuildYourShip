@@ -7,6 +7,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Remotes = require(Shared.Remotes)
 local ShipGrid = require(Shared.ShipGrid)
+local Zones = require(Shared.Zones)
 
 local StateService = {}
 local S
@@ -38,6 +39,12 @@ function StateService.Send(player: Player)
 	local sailing = S.ShipService.ShipFor(player) -- captain's ship if crew
 	local vesselOk, vesselRules = ShipGrid.VesselCheck(profile.Blueprint)
 	local carried = S.CargoService.GetCarried(player)
+	local rating = Zones.Rating(profile.Blueprint)
+	local nextZone = nil
+	if rating < #Zones.Defs then
+		local _, rules = Zones.Check(profile.Blueprint, rating + 1)
+		nextZone = { Index = rating + 1, Name = Zones.Get(rating + 1).Name, Rules = rules }
+	end
 	stateEvent:FireClient(player, {
 		Gold = profile.Gold,
 		Inventory = profile.Inventory,
@@ -57,6 +64,11 @@ function StateService.Send(player: Player)
 			Building = sailing.Building,
 		},
 		Carrying = carried and carried.Good,
+		Tier = profile.Tier,
+		Discovered = profile.Discovered,
+		Rating = rating,
+		NextZone = nextZone,
+		Zone = sailing and sailing.Root and sailing.Root.Parent and Zones.At(sailing.Root.Position) or 1,
 		Crew = S.CrewService.Summary(player),
 		Quest = S.QuestService.Summary(player),
 		Passes = S.GamepassService.Owned(player),

@@ -53,6 +53,7 @@ local EFFECTS = {
 	Muzzle = { Color = { Color3.fromRGB(255, 220, 150), Color3.fromRGB(120, 116, 112) }, Count = 14, Size = { 1.5, 5 }, Speed = { 8, 20 }, Life = { 0.6, 1.4 }, Light = 0.6 },
 	Explosion = { Color = { Color3.fromRGB(255, 170, 70), Color3.fromRGB(70, 64, 60) }, Count = 30, Size = { 2, 7 }, Speed = { 10, 26 }, Life = { 0.6, 1.6 }, Light = 0.8 },
 	Impact = { Color = { Color3.fromRGB(170, 150, 120), Color3.fromRGB(110, 100, 90) }, Count = 14, Size = { 1, 3 }, Speed = { 6, 14 }, Life = { 0.5, 1 }, Light = 0 },
+	Crash = { Color = { Color3.fromRGB(150, 116, 80), Color3.fromRGB(230, 236, 240) }, Count = 24, Size = { 1, 4 }, Speed = { 10, 22 }, Life = { 0.6, 1.2 }, Light = 0 },
 	Splash = { Color = { Color3.fromRGB(235, 245, 250), Color3.fromRGB(180, 210, 220) }, Count = 26, Size = { 1.2, 4 }, Speed = { 14, 26 }, Life = { 0.6, 1.2 }, Light = 0.1, Up = true },
 }
 

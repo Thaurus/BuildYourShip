@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Islands = require(Shared.Islands)
+local Zones = require(Shared.Zones)
 
 local StormService = {}
 local S
@@ -54,7 +55,7 @@ end
 local function startStorm()
 	for _ = 1, 30 do
 		local a = rng:NextNumber(0, math.pi * 2)
-		local r = rng:NextNumber(500, Config.WORLD_RADIUS - 200)
+		local r = rng:NextNumber(Zones.Get(1).Outer + 250, Config.WORLD_RADIUS - 200) -- never in the Sheltered Bay
 		local pos = Vector3.new(math.cos(a) * r, 0, math.sin(a) * r)
 		if not Islands.IsSafe(pos) and (pos - Islands.Get("PortHaven").Position).Magnitude > 600 then
 			local heading = rng:NextNumber(0, math.pi * 2)
