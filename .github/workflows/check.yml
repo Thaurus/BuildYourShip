@@ -1,0 +1,40 @@
+# Checks the game without Roblox Studio: lint, type-check against the Roblox
+# API, and build a place file you can download from the run's artifacts.
+name: Check
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools (aftman.toml)
+        uses: ok-nick/setup-aftman@v0.4.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build place file
+        run: rojo build default.project.json -o BuildYourShip.rbxl
+
+      - name: Upload place file
+        uses: actions/upload-artifact@v4
+        with:
+          name: BuildYourShip-place
+          path: BuildYourShip.rbxl
+
+      - name: Lint (selene)
+        if: always()
+        run: selene src
+
+      - name: Type check (luau-lsp)
+        if: always()
+        run: |
+          rojo sourcemap default.project.json -o sourcemap.json
+          curl -fsSL -o globalTypes.d.luau https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/main/scripts/globalTypes.d.luau \
+            || curl -fsSL -o globalTypes.d.luau https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/main/scripts/globalTypes.d.lua
+          luau-lsp analyze --definitions=globalTypes.d.luau --sourcemap=sourcemap.json --no-strict-dm-types src

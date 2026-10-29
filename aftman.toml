@@ -1,0 +1,5 @@
+# Tool versions used by CI (and locally with `aftman install`)
+[tools]
+rojo = "rojo-rbx/rojo@7.4.4"
+selene = "Kampfkarren/selene@0.27.1"
+luau-lsp = "JohnnyMorganz/luau-lsp@1.32.1"

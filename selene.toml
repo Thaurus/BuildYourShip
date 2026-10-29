@@ -1,0 +1,7 @@
+std = "roblox"
+
+[lints]
+# Services pass a shared table around; unused parameters are common and harmless
+unused_variable = "warn"
+shadowing = "allow"
+multiple_statements = "allow"
