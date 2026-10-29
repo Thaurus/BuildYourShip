@@ -18,6 +18,17 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Install luau-lsp (latest release)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p "$HOME/luau-lsp"
+          gh release download --repo JohnnyMorganz/luau-lsp --pattern 'luau-lsp-linux*.zip' --dir "$HOME/luau-lsp"
+          ls "$HOME/luau-lsp"
+          unzip -o "$(ls "$HOME"/luau-lsp/*.zip | grep -v arm | head -1)" -d "$HOME/luau-lsp"
+          chmod +x "$HOME/luau-lsp/luau-lsp"
+          echo "$HOME/luau-lsp" >> "$GITHUB_PATH"
+
       - name: Build place file
         run: rojo build default.project.json -o BuildYourShip.rbxl
 
