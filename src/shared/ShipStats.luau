@@ -1,12 +1,12 @@
--- Derives sailing stats from a blueprint plus the cargo currently on board.
+-- Derives sailing and combat stats from a blueprint plus the crates on board.
 
 local Config = require(script.Parent.Config)
 local Items = require(script.Parent.Items)
 
 local ShipStats = {}
 
-function ShipStats.Compute(blueprint, cargoCount: number)
-	local mass, buoyancy, thrust, turn, capacity = 0, 0, Config.BASE_THRUST, 0, 0
+function ShipStats.Compute(blueprint, crateCount: number)
+	local mass, buoyancy, thrust, turn, slots, hp, stability, cannons = 0, 0, Config.BASE_THRUST, 0, 0, 0, 0, 0
 	for _, entry in blueprint do
 		local def = Items.Get(entry.t)
 		local s = def and def.Stats
@@ -15,14 +15,19 @@ function ShipStats.Compute(blueprint, cargoCount: number)
 			buoyancy += s.Buoyancy or 0
 			thrust += s.Thrust or 0
 			turn += s.Turn or 0
-			capacity += s.Cargo or 0
+			slots += s.Crates or 0
+			hp += s.HP or 0
+			stability += s.Stability or 0
+		end
+		if entry.t == "Cannon" then
+			cannons += 1
 		end
 	end
 
-	-- Cargo space is limited by crates AND by how much extra weight the hull can float.
-	local reserve = math.max(0, math.floor(buoyancy - mass))
-	local maxCargo = math.min(capacity, reserve)
-	local totalMass = mass + cargoCount * Config.CARGO_UNIT_MASS
+	-- Crate space is limited by cargo holds AND by how much extra weight the hull can float.
+	local reserve = math.max(0, math.floor((buoyancy - mass) / Config.CRATE_MASS))
+	local maxCrates = math.min(slots, reserve)
+	local totalMass = mass + crateCount * Config.CRATE_MASS
 	local overloaded = totalMass > buoyancy
 	local load = if buoyancy > 0 then totalMass / buoyancy else 2
 
@@ -40,12 +45,15 @@ function ShipStats.Compute(blueprint, cargoCount: number)
 		Mass = totalMass,
 		Buoyancy = buoyancy,
 		Thrust = thrust,
-		Capacity = capacity,
-		MaxCargo = maxCargo,
+		CrateSlots = slots,
+		MaxCrates = maxCrates,
 		Load = load,
 		Overloaded = overloaded,
 		MaxSpeed = maxSpeed,
 		TurnRate = turnRate,
+		MaxHP = math.max(10, hp),
+		Stability = stability,
+		Cannons = cannons,
 		-- Root height above sea level: the hull's top row sits just above the waterline
 		FloatOffset = -0.6 - draft,
 	}

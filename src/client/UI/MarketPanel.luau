@@ -1,4 +1,4 @@
--- Island trader: buy local goods cheaply, sell what the island wants for profit.
+-- Island trader: buy crates of local goods cheaply; carry crates here to sell them.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -13,7 +13,7 @@ local C = UIKit.Colors
 local MarketPanel = {}
 
 function MarketPanel.Init(ctx)
-	local panel = UIKit.Panel(ctx.Screen, "Market", UDim2.fromOffset(720, 520), C.Green)
+	local panel = UIKit.Panel(ctx.Screen, "Market", UDim2.fromOffset(680, 560), C.Green)
 	local currentIsland: string? = nil
 	local busy = false
 
@@ -44,12 +44,12 @@ function MarketPanel.Init(ctx)
 
 	local refresh
 
-	local function trade(goodId: string, action: string, amount: number)
+	local function buy(goodId: string)
 		if busy or not currentIsland then
 			return
 		end
 		busy = true
-		local result = ctx.Invoke("Trade", currentIsland, goodId, action, amount)
+		local result = ctx.Invoke("BuyCrate", currentIsland, goodId)
 		if result and result.ok then
 			ctx.Sounds.Pop()
 		end
@@ -61,77 +61,74 @@ function MarketPanel.Init(ctx)
 		UIKit.Clear(list)
 		panel.Banner.Title.Text = string.upper(snapshot.IslandName)
 		panel.Banner.Size = UDim2.fromOffset(math.max(220, #snapshot.IslandName * 22 + 60), 54)
-		headerTitle.Text = `<b>{snapshot.Trader}</b>'s trading post`
-		local dock = if snapshot.Docked
-			then `<font color="#3A9A3A">⚓ Your ship is docked here</font>`
-			else `<font color="#D8443A">⚠️ Dock your ship here to load cargo</font>`
-		headerInfo.Text = `{dock}    📦 Cargo <b>{snapshot.CargoCount}/{snapshot.MaxCargo}</b>    💰 <b>{snapshot.Gold}g</b>`
+		headerTitle.Text = `<b>{snapshot.Trader}</b>'s trading post    💰 <b>{snapshot.Gold}g</b>`
+		if snapshot.Carrying then
+			local carried
+			for _, good in snapshot.Goods do
+				if good.Id == snapshot.Carrying then
+					carried = good
+				end
+			end
+			headerInfo.Text = `You carry {carried.Icon} {carried.Name}: close this and press <b>E · Sell crate</b> for <b>{carried.SellPrice}g</b>`
+		else
+			headerInfo.Text = "Bought crates appear on the loading pad. Carry them aboard and stow them!"
+		end
 
 		for order, good in snapshot.Goods do
-			-- Show goods this island trades in, plus anything you're carrying
-			if good.Local or good.Wanted or good.Owned > 0 then
-				local card = UIKit.Card({
-					Color = if good.Wanted then Color3.fromRGB(255, 246, 214) else C.White,
-					Size = UDim2.new(1, 0, 0, 64),
-					LayoutOrder = order,
-					Parent = list,
+			local card = UIKit.Card({
+				Color = if good.Wanted then Color3.fromRGB(250, 238, 206) else C.White,
+				Size = UDim2.new(1, 0, 0, 60),
+				LayoutOrder = order,
+				Parent = list,
+			})
+			UIKit.Label({
+				Text = good.Icon,
+				TextSize = 30,
+				TextXAlignment = Enum.TextXAlignment.Center,
+				Size = UDim2.fromOffset(56, 60),
+				Parent = card,
+			})
+			local tag = if good.Wanted then `<font color="#B0602A">WANTED</font>` elseif good.Local then `<font color="#305A88">LOCAL</font>` else ""
+			UIKit.Label({
+				Text = `<b>{good.Name}</b>  {tag}`,
+				RichText = true,
+				TextSize = 17,
+				Size = UDim2.new(1, -320, 0, 24),
+				Position = UDim2.fromOffset(58, 8),
+				Parent = card,
+			})
+			UIKit.Label({
+				Text = `Pays {good.SellPrice}g per crate here`,
+				TextSize = 13,
+				TextColor3 = Color3.fromRGB(110, 100, 90),
+				Size = UDim2.new(1, -320, 0, 18),
+				Position = UDim2.fromOffset(58, 33),
+				Parent = card,
+			})
+			if good.BuyPrice then
+				local b = UIKit.Button({
+					Text = `Buy crate {good.BuyPrice}g`,
+					Color = C.Blue,
+					TextSize = 15,
+					Size = UDim2.fromOffset(170, 40),
+					Position = UDim2.new(1, -178, 0.5, 0),
+					AnchorPoint = Vector2.new(0, 0.5),
+					Parent = card,
+					OnClick = function()
+						buy(good.Id)
+					end,
 				})
+				UIKit.SetEnabled(b, snapshot.Gold >= good.BuyPrice)
+			else
 				UIKit.Label({
-					Text = good.Icon,
-					TextSize = 32,
-					TextXAlignment = Enum.TextXAlignment.Center,
-					Size = UDim2.fromOffset(56, 64),
+					Text = "not sold here",
+					TextSize = 13,
+					TextColor3 = C.Grey,
+					TextXAlignment = Enum.TextXAlignment.Right,
+					Size = UDim2.fromOffset(160, 40),
+					Position = UDim2.new(1, -170, 0.5, -20),
 					Parent = card,
 				})
-				local tag = if good.Wanted then `<font color="#E8762E">🔥 WANTED</font>` elseif good.Local then `<font color="#3A8AD8">🏷️ LOCAL</font>` else ""
-				UIKit.Label({
-					Text = `<b>{good.Name}</b>  {tag}`,
-					RichText = true,
-					TextSize = 18,
-					Size = UDim2.new(1, -380, 0, 24),
-					Position = UDim2.fromOffset(58, 8),
-					Parent = card,
-				})
-				UIKit.Label({
-					Text = `aboard: {good.Owned}`,
-					TextSize = 14,
-					TextColor3 = Color3.fromRGB(110, 100, 90),
-					Size = UDim2.new(1, -380, 0, 20),
-					Position = UDim2.fromOffset(58, 34),
-					Parent = card,
-				})
-
-				local x = -8
-				local function button(text, color, enabled, onClick, width)
-					x -= width
-					local b = UIKit.Button({
-						Text = text,
-						Color = color,
-						TextSize = 16,
-						Size = UDim2.fromOffset(width, 40),
-						Position = UDim2.new(1, x, 0.5, 0),
-						AnchorPoint = Vector2.new(0, 0.5),
-						Parent = card,
-						OnClick = onClick,
-					})
-					UIKit.SetEnabled(b, enabled)
-					x -= 6
-				end
-				local room = snapshot.MaxCargo - snapshot.CargoCount
-				button(`Sell x5`, C.Orange, good.Owned >= 1 and snapshot.Docked, function()
-					trade(good.Id, "sell", 5)
-				end, 80)
-				button(`Sell {good.SellPrice}g`, C.Green, good.Owned >= 1 and snapshot.Docked, function()
-					trade(good.Id, "sell", 1)
-				end, 100)
-				if good.BuyPrice then
-					button(`x5`, C.Teal, room >= 1 and snapshot.Docked and snapshot.Gold >= good.BuyPrice, function()
-						trade(good.Id, "buy", 5)
-					end, 52)
-					button(`Buy {good.BuyPrice}g`, C.Blue, room >= 1 and snapshot.Docked and snapshot.Gold >= good.BuyPrice, function()
-						trade(good.Id, "buy", 1)
-					end, 100)
-				end
 			end
 		end
 	end

@@ -180,7 +180,7 @@ function InventoryPanel.Init(ctx)
 					Parent = card,
 				})
 				UIKit.Label({
-					Text = `<b>{def.Name}</b>   <font color="#8A8274">owned {data.Inventory[id] or 0}</font>`,
+					Text = `<b>{def.Name}</b>{if def.Yield > 1 then " x" .. def.Yield else ""}   <font color="#8A8274">owned {data.Inventory[id] or 0}</font>`,
 					RichText = true,
 					TextSize = 19,
 					Size = UDim2.new(1, -330, 0, 24),

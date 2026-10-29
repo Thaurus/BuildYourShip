@@ -1,27 +1,27 @@
--- Comic-book UI toolkit: chunky ink outlines, cream paper panels, tilted title
--- banners, bouncy buttons and pop-in animations.
+-- Nautical UI toolkit: parchment panels, brass and ink trim, serif titles,
+-- gently bouncing buttons and pop-in animations.
 
 local TweenService = game:GetService("TweenService")
 
 local UIKit = {}
 
 UIKit.Colors = {
-	Ink = Color3.fromRGB(30, 26, 38),
-	Paper = Color3.fromRGB(255, 248, 230),
-	PaperDark = Color3.fromRGB(242, 228, 196),
-	White = Color3.fromRGB(255, 255, 255),
-	Yellow = Color3.fromRGB(255, 208, 64),
-	Orange = Color3.fromRGB(255, 152, 54),
-	Red = Color3.fromRGB(236, 76, 64),
-	Green = Color3.fromRGB(92, 200, 90),
-	Blue = Color3.fromRGB(64, 142, 232),
-	Teal = Color3.fromRGB(40, 192, 182),
-	Purple = Color3.fromRGB(150, 96, 220),
-	Grey = Color3.fromRGB(176, 170, 162),
+	Ink = Color3.fromRGB(38, 30, 26),
+	Paper = Color3.fromRGB(244, 234, 212),
+	PaperDark = Color3.fromRGB(222, 206, 174),
+	White = Color3.fromRGB(252, 248, 240),
+	Yellow = Color3.fromRGB(206, 164, 72),
+	Orange = Color3.fromRGB(192, 118, 56),
+	Red = Color3.fromRGB(164, 58, 48),
+	Green = Color3.fromRGB(78, 132, 70),
+	Blue = Color3.fromRGB(48, 90, 136),
+	Teal = Color3.fromRGB(44, 114, 112),
+	Purple = Color3.fromRGB(100, 76, 128),
+	Grey = Color3.fromRGB(146, 140, 130),
 }
 
-UIKit.TitleFont = Enum.Font.LuckiestGuy
-UIKit.BodyFont = Enum.Font.FredokaOne
+UIKit.TitleFont = Enum.Font.Merriweather
+UIKit.BodyFont = Enum.Font.GothamMedium
 
 local C = UIKit.Colors
 
@@ -53,7 +53,7 @@ end
 function UIKit.Stroke(parent: Instance, thickness: number?, color: Color3?)
 	return Create("UIStroke", {
 		Name = "Outline",
-		Thickness = thickness or 3,
+		Thickness = (thickness or 3) * 0.7,
 		Color = color or C.Ink,
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 		LineJoinMode = Enum.LineJoinMode.Round,
@@ -285,7 +285,7 @@ function UIKit.Panel(parent: Instance, title: string, size: UDim2, accent: Color
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0),
 		Size = UDim2.fromOffset(math.max(220, #title * 22 + 60), 54),
-		Rotation = -2,
+		Rotation = 0,
 		ZIndex = 8,
 		Parent = holder,
 	})
@@ -440,7 +440,6 @@ function UIKit.Toast(screen: ScreenGui, text: string, kind: string?)
 	})
 	local scale = Create("UIScale", { Scale = 0.3, Parent = toast })
 	TweenService:Create(scale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
-	toast.Rotation = math.random(-3, 3)
 
 	task.delay(3, function()
 		local tween = TweenService:Create(scale, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In), { Scale = 0 })

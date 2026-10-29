@@ -1,8 +1,11 @@
 -- Island markets. Each island sells what it produces cheaply and pays well for
--- what it wants. Prices react to trading (buying pushes them up, selling pushes
--- them down) and slowly recover, so the best routes shift over time.
+-- what it wants. Goods are physical crates: buying puts a crate on the trader's
+-- loading pad; selling means carrying a crate up to the trader.
+-- Prices react to trading (buying pushes them up, selling pushes them down)
+-- and slowly recover, so the best routes shift over time.
 
 local CollectionService = game:GetService("CollectionService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -12,9 +15,9 @@ local Islands = require(Shared.Islands)
 local Remotes = require(Shared.Remotes)
 
 local MarketService = {}
-local DataService, InventoryService, ShipService, StateService
+local S
 
-local PRESSURE_PER_UNIT = 0.012
+local PRESSURE_PER_CRATE = 0.05
 local MAX_PRESSURE = 0.5
 local RECOVERY = 0.97 -- per tick
 local RECOVERY_TICK = 5
@@ -23,10 +26,7 @@ local RECOVERY_TICK = 5
 local pressure = {}
 
 function MarketService.Init(services)
-	DataService = services.DataService
-	InventoryService = services.InventoryService
-	ShipService = services.ShipService
-	StateService = services.StateService
+	S = services
 	for _, id in Islands.Order do
 		pressure[id] = {}
 		for _, goodId in Goods.Order do
@@ -35,7 +35,7 @@ function MarketService.Init(services)
 	end
 end
 
--- Price the player pays to buy one unit here (nil if this island doesn't sell it)
+-- Price to buy one crate here (nil if this island doesn't sell it)
 local function buyPrice(islandId: string, goodId: string): number?
 	local factor = Islands.Get(islandId).Market.Sells[goodId]
 	if not factor then
@@ -45,7 +45,7 @@ local function buyPrice(islandId: string, goodId: string): number?
 	return math.max(1, math.floor(Goods.Get(goodId).Price * factor * (1 + p) + 0.5))
 end
 
--- Price the player receives for selling one unit here
+-- Price received for selling one crate here
 local function sellPrice(islandId: string, goodId: string): number
 	local factor = Islands.Get(islandId).Market.Buys[goodId] or Goods.NEUTRAL_SELL_FACTOR
 	local p = pressure[islandId][goodId].sell
@@ -70,11 +70,10 @@ end
 
 function MarketService.Snapshot(player: Player, islandId: any)
 	local island = type(islandId) == "string" and Islands.Get(islandId)
-	local profile = DataService.Get(player)
+	local profile = S.DataService.Get(player)
 	if not island or not profile then
 		return nil
 	end
-	local ship = ShipService.Get(player)
 	local goods = {}
 	for _, goodId in Goods.Order do
 		local good = Goods.Get(goodId)
@@ -86,97 +85,104 @@ function MarketService.Snapshot(player: Player, islandId: any)
 			SellPrice = sellPrice(islandId, goodId),
 			Wanted = island.Market.Buys[goodId] ~= nil,
 			Local = island.Market.Sells[goodId] ~= nil,
-			Owned = profile.Cargo[goodId] or 0,
 		})
 	end
+	local carried = S.CargoService.GetCarried(player)
 	return {
 		IslandId = islandId,
 		IslandName = island.Name,
 		Trader = island.Trader.Name,
-		Docked = ship ~= nil and ship.DockedAt == islandId and not ship.Building,
 		Gold = profile.Gold,
-		CargoCount = StateService.CargoCount(profile.Cargo),
-		MaxCargo = ship and ship.Stats.MaxCargo or 0,
+		Carrying = carried and carried.Good,
 		Goods = goods,
 	}
 end
 
-function MarketService.Trade(player: Player, islandId: any, goodId: any, action: any, amount: any)
+function MarketService.BuyCrate(player: Player, islandId: any, goodId: any)
 	local island = type(islandId) == "string" and Islands.Get(islandId)
 	local good = type(goodId) == "string" and Goods.Get(goodId)
-	local profile = DataService.Get(player)
-	if not island or not good or not profile or (action ~= "buy" and action ~= "sell") then
+	if not island or not good then
 		return { ok = false, msg = "Invalid trade." }
 	end
-	if type(amount) ~= "number" or amount ~= amount then
-		return { ok = false, msg = "Invalid amount." }
-	end
-	amount = math.clamp(math.floor(amount), 1, 100)
-
 	if not nearTrader(player, islandId) then
 		return { ok = false, msg = "Walk over to the trader first." }
 	end
-	local ship = ShipService.Get(player)
-	if not ship or ship.DockedAt ~= islandId or ship.Building then
-		return { ok = false, msg = `Dock your ship at {island.Name} to load cargo!` }
+	local price = buyPrice(islandId, goodId)
+	if not price then
+		return { ok = false, msg = `{island.Name} doesn't sell {good.Name}.` }
 	end
+	if S.InventoryService.Gold(player) < price then
+		return { ok = false, msg = `You need {price} gold.` }
+	end
+	local ok, reason = S.CargoService.SpawnOnPad(player, islandId, goodId)
+	if not ok then
+		return { ok = false, msg = reason }
+	end
+	S.InventoryService.SpendGold(player, price)
+	local p = pressure[islandId][goodId]
+	p.buy = math.min(MAX_PRESSURE, p.buy + PRESSURE_PER_CRATE)
+	S.QuestService.Fire(player, "BuyCrate", goodId)
+	return { ok = true, msg = `Bought a {good.Icon} {good.Name} crate for {price}g. Pick it up from the pad!` }
+end
 
-	if action == "buy" then
-		if not buyPrice(islandId, goodId) then
-			return { ok = false, msg = `{island.Name} doesn't sell {good.Name}.` }
-		end
-		local room = ship.Stats.MaxCargo - StateService.CargoCount(profile.Cargo)
-		amount = math.min(amount, room)
-		if amount <= 0 then
-			return { ok = false, msg = "Your cargo hold is full! Build more crates." }
-		end
-		-- Price each unit separately so big orders feel the price climb
-		local total = 0
-		for _ = 1, amount do
-			total += buyPrice(islandId, goodId)
-			local p = pressure[islandId][goodId]
-			p.buy = math.min(MAX_PRESSURE, p.buy + PRESSURE_PER_UNIT)
-		end
-		if not InventoryService.SpendGold(player, total) then
-			-- Roll back the price change
-			local p = pressure[islandId][goodId]
-			p.buy = math.max(0, p.buy - PRESSURE_PER_UNIT * amount)
-			return { ok = false, msg = `You need {total} gold.` }
-		end
-		profile.Cargo[goodId] = (profile.Cargo[goodId] or 0) + amount
-		ShipService.RefreshStats(player)
-		return { ok = true, msg = `Loaded {amount}x {good.Icon} {good.Name} for {total}g` }
-	else
-		local have = profile.Cargo[goodId] or 0
-		amount = math.min(amount, have)
-		if amount <= 0 then
-			return { ok = false, msg = `You have no {good.Name} aboard.` }
-		end
-		local total = 0
-		for _ = 1, amount do
-			total += sellPrice(islandId, goodId)
-			local p = pressure[islandId][goodId]
-			p.sell = math.min(MAX_PRESSURE, p.sell + PRESSURE_PER_UNIT)
-		end
-		profile.Cargo[goodId] = if have - amount > 0 then have - amount else nil
-		profile.Stats.Trades = (profile.Stats.Trades or 0) + 1
-		InventoryService.AddGold(player, total)
-		ShipService.RefreshStats(player)
-		return { ok = true, msg = `Sold {amount}x {good.Icon} {good.Name} for {total}g!` }
+-- Sell the crate the player is carrying. Crew crates pay every crew member.
+function MarketService.SellCarried(player: Player, islandId: string)
+	local carried = S.CargoService.GetCarried(player)
+	if not carried then
+		return
 	end
+	if not nearTrader(player, islandId) then
+		return
+	end
+	local record = S.CargoService.TakeCarried(player)
+	local good = Goods.Get(record.Good)
+	local price = sellPrice(islandId, record.Good)
+	local p = pressure[islandId][record.Good]
+	p.sell = math.min(MAX_PRESSURE, p.sell + PRESSURE_PER_CRATE)
+
+	local captain = S.CrewService.CaptainOf(player)
+	local recipients = { player }
+	if record.OwnerId == captain.UserId then
+		recipients = S.CrewService.Members(captain)
+	end
+	local share = math.floor(price / #recipients)
+	local remainder = price - share * #recipients
+	for _, member in recipients do
+		local amount = share + (if member == player then remainder else 0)
+		if S.GamepassService.Has(member, "MerchantGuild") then
+			amount = math.floor(amount * 1.25)
+		end
+		if member.Parent == Players and amount > 0 then
+			S.InventoryService.AddGold(member, amount)
+			S.QuestService.Fire(member, "TradeGold", nil, amount)
+			local profile = S.DataService.Get(member)
+			if profile then
+				profile.Stats.Trades = (profile.Stats.Trades or 0) + 1
+			end
+			local text = if member == player then `Sold {good.Icon} {good.Name} for {amount}g!` else `{player.DisplayName} sold {good.Icon} {good.Name}: your share {amount}g`
+			S.StateService.Notify(member, text, "gain")
+		end
+	end
+	S.QuestService.Fire(player, "SellCrate", record.Good)
 end
 
 function MarketService.Start()
 	Remotes.Function("GetMarket").OnServerInvoke = MarketService.Snapshot
-	Remotes.Function("Trade").OnServerInvoke = MarketService.Trade
+	Remotes.Function("BuyCrate").OnServerInvoke = MarketService.BuyCrate
 
 	local openMarket = Remotes.Event("OpenMarket")
 	local function hook(npc: Instance)
-		local prompt = npc:FindFirstChildWhichIsA("ProximityPrompt", true)
 		local islandId = npc:GetAttribute("IslandId")
-		if prompt and islandId then
-			prompt.Triggered:Connect(function(player)
+		local trade = npc:FindFirstChild("TradePrompt", true) :: ProximityPrompt?
+		local sell = npc:FindFirstChild("SellPrompt", true) :: ProximityPrompt?
+		if trade and islandId then
+			trade.Triggered:Connect(function(player)
 				openMarket:FireClient(player, islandId)
+			end)
+		end
+		if sell and islandId then
+			sell.Triggered:Connect(function(player)
+				MarketService.SellCarried(player, islandId)
 			end)
 		end
 	end

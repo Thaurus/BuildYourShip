@@ -14,10 +14,17 @@ local services = {
 	DataService = require(Services.DataService),
 	StateService = require(Services.StateService),
 	InventoryService = require(Services.InventoryService),
+	GamepassService = require(Services.GamepassService),
+	QuestService = require(Services.QuestService),
+	CrewService = require(Services.CrewService),
 	HarvestService = require(Services.HarvestService),
 	CraftingService = require(Services.CraftingService),
+	CargoService = require(Services.CargoService),
 	MarketService = require(Services.MarketService),
 	ShipService = require(Services.ShipService),
+	CombatService = require(Services.CombatService),
+	StormService = require(Services.StormService),
+	PirateService = require(Services.PirateService),
 }
 
 for _, service in services do
@@ -28,14 +35,27 @@ end
 
 services.WorldBuilder.Build()
 
-for _, service in services do
-	if service.Start then
-		service.Start()
-	end
+-- Start order matters a little: ships need the world, pirates need ships
+local START_ORDER = {
+	"DataService",
+	"GamepassService",
+	"CrewService",
+	"HarvestService",
+	"CraftingService",
+	"CargoService",
+	"MarketService",
+	"ShipService",
+	"CombatService",
+	"StormService",
+	"PirateService",
+}
+for _, name in START_ORDER do
+	services[name].Start()
 end
 
 local function onPlayerAdded(player: Player)
 	local profile = services.DataService.Load(player)
+	services.GamepassService.Load(player)
 	if not player.Parent then
 		services.DataService.Profiles[player] = nil
 		return
@@ -54,7 +74,7 @@ local function onPlayerAdded(player: Player)
 	end)
 	player:LoadCharacter()
 
-	services.ShipService.Spawn(player)
+	services.ShipService.SpawnPlayerShip(player)
 	services.StateService.Push(player)
 	if not profile.SeenTutorial then
 		services.StateService.Notify(player, "Welcome to Port Haven, captain!", "good")
@@ -74,6 +94,6 @@ for _, player in Players:GetPlayers() do
 end
 
 Players.PlayerRemoving:Connect(function(player)
-	services.ShipService.Despawn(player)
+	services.ShipService.DespawnPlayer(player)
 	services.DataService.Release(player)
 end)

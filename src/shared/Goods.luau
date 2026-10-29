@@ -1,16 +1,16 @@
 --!strict
--- Trade goods carried as cargo between island traders.
+-- Trade goods. Each unit is one physical crate that has to be carried and stowed.
 
 local Goods = {}
 
 Goods.Defs = {
-	Fish = { Name = "Fish", Icon = "🐟", Price = 8 },
-	Fruit = { Name = "Tropical Fruit", Icon = "🍍", Price = 10 },
-	Pottery = { Name = "Pottery", Icon = "🏺", Price = 14 },
-	Coffee = { Name = "Coffee", Icon = "☕", Price = 18 },
-	Tools = { Name = "Tools", Icon = "🛠️", Price = 24 },
-	Spices = { Name = "Spices", Icon = "🌶️", Price = 30 },
-	Furs = { Name = "Furs", Icon = "🧣", Price = 36 },
+	Fish = { Name = "Fish", Icon = "🐟", Price = 40, Color = Color3.fromRGB(70, 120, 160) },
+	Fruit = { Name = "Tropical Fruit", Icon = "🍍", Price = 50, Color = Color3.fromRGB(214, 160, 50) },
+	Pottery = { Name = "Pottery", Icon = "🏺", Price = 70, Color = Color3.fromRGB(176, 96, 60) },
+	Coffee = { Name = "Coffee", Icon = "☕", Price = 90, Color = Color3.fromRGB(96, 62, 42) },
+	Tools = { Name = "Tools", Icon = "🛠️", Price = 120, Color = Color3.fromRGB(110, 116, 126) },
+	Spices = { Name = "Spices", Icon = "🌶️", Price = 150, Color = Color3.fromRGB(170, 50, 40) },
+	Furs = { Name = "Furs", Icon = "🧣", Price = 180, Color = Color3.fromRGB(140, 110, 80) },
 }
 
 Goods.Order = { "Fish", "Fruit", "Pottery", "Coffee", "Tools", "Spices", "Furs" }

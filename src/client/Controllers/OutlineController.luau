@@ -1,4 +1,5 @@
--- Comic ink outlines. Roblox renders at most 31 Highlights at once, so we keep a
+-- Subtle ink outlines that give the realistic scene an illustrated edge.
+-- Roblox renders at most 31 Highlights at once, so we keep a
 -- pool and assign it to the nearest models tagged "Outline" a few times a second.
 -- Your own ship always gets one.
 
@@ -7,11 +8,17 @@ local Players = game:GetService("Players")
 
 local OutlineController = {}
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Config = require(ReplicatedStorage:WaitForChild("Shared").Config)
+
 local MAX_OUTLINES = 28
-local MAX_DISTANCE = 260
-local INK = Color3.fromRGB(30, 26, 38)
+local MAX_DISTANCE = 220
+local INK = Color3.fromRGB(28, 24, 22)
 
 function OutlineController.Init()
+	if not Config.OUTLINES_ENABLED then
+		return
+	end
 	local camera = workspace.CurrentCamera
 	local pool: { Highlight } = {}
 	local folder = Instance.new("Folder")
@@ -23,7 +30,7 @@ function OutlineController.Init()
 		h.Name = `Outline{i}`
 		h.FillTransparency = 1
 		h.OutlineColor = INK
-		h.OutlineTransparency = 0.05
+		h.OutlineTransparency = 0.55
 		h.DepthMode = Enum.HighlightDepthMode.Occluded
 		h.Enabled = false
 		h.Parent = folder
@@ -45,7 +52,7 @@ function OutlineController.Init()
 							distance = -1
 						end
 						-- Big models (piers, ships) are measured generously
-						if model.Name == "Pier" then
+						if model.Name == "Pier" or model:GetAttribute("Drydock") then
 							distance *= 0.4
 						end
 						if distance < MAX_DISTANCE then

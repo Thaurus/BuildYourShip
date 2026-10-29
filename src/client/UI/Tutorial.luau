@@ -1,4 +1,5 @@
--- First-time welcome card that explains the game loop in four comic panels.
+-- First-time welcome card that explains the game loop in four panels.
+-- The quest tracker (top right) then guides the player step by step.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -9,14 +10,14 @@ local C = UIKit.Colors
 local Tutorial = {}
 
 local STEPS = {
-	{ "🪓", "Gather", "Chop trees, gather flax and mine ore on the islands. Hold [E] on them.", C.Green },
-	{ "🔨", "Craft & Build", "Craft planks, rope and sails [I], then press [B] at your berth to expand your ship.", C.Orange },
-	{ "⛵", "Sail", "Press [H] to take the helm. W/S to sail, A/D to steer. Follow the island markers!", C.Blue },
-	{ "💰", "Trade", "Buy goods cheap where they're LOCAL, sell where they're WANTED. Bigger ship = bigger profit!", C.Yellow },
+	{ "🪓", "Gather & craft", "Chop trees, gather flax, mine ore (hold E). Craft planks, rope and ship parts [I].", C.Green },
+	{ "🔨", "Build", "Press [B] next to your ship in Port Haven to open your drydock. Bow in front, symmetric, longer than wide!", C.Orange },
+	{ "📦", "Haul cargo", "Buy crates from traders, carry them aboard and stow them. Sail [H] and sell where goods are WANTED.", C.Blue },
+	{ "☠️", "Survive", "Pirates, storms and rival captains roam the sea. Mount cannons and fire broadsides [F]. Crew up with friends [C]!", C.Red },
 }
 
 function Tutorial.Init(ctx)
-	local panel = UIKit.Panel(ctx.Screen, "Ahoy, Captain!", UDim2.fromOffset(760, 430), C.Blue)
+	local panel = UIKit.Panel(ctx.Screen, "Ahoy, Captain!", UDim2.fromOffset(780, 440), C.Blue)
 
 	local grid = Instance.new("Frame")
 	grid.BackgroundTransparency = 1

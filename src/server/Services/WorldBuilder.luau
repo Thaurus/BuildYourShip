@@ -29,6 +29,34 @@ local worldFolder: Folder
 -- Part helpers
 --------------------------------------------------------------------------------
 
+-- Props pick a realistic material from their palette colour unless told otherwise,
+-- so foliage reads as foliage, stone as stone and timber as timber.
+local M = Enum.Material
+local MATERIAL_BY_COLOUR = {
+	[Palette.Leaf] = M.Grass,
+	[Palette.LeafDark] = M.Grass,
+	[Palette.LeafLight] = M.Grass,
+	[Palette.Pine] = M.Grass,
+	[Palette.Trunk] = M.Wood,
+	[Palette.PalmTrunk] = M.Wood,
+	[Palette.Wood] = M.WoodPlanks,
+	[Palette.WoodLight] = M.WoodPlanks,
+	[Palette.WoodDark] = M.Wood,
+	[Palette.Rock] = M.Slate,
+	[Palette.RockDark] = M.Slate,
+	[Palette.Stone] = M.Cobblestone,
+	[Palette.Snow] = M.Snow,
+	[Palette.Plaster] = M.Plaster,
+	[Palette.Cream] = M.Plaster,
+	[Palette.RoofTile] = M.ClayRoofTiles,
+	[Palette.Iron] = M.Metal,
+	[Palette.IronDark] = M.Metal,
+	[Palette.Ink] = M.Metal,
+	[Palette.Brass] = M.Metal,
+	[Palette.Rope] = M.Fabric,
+	[Palette.Sail] = M.Fabric,
+}
+
 local function newPart(parent: Instance, props): BasePart
 	local p = Instance.new(props.ClassName or "Part")
 	if props.Shape then
@@ -37,7 +65,7 @@ local function newPart(parent: Instance, props): BasePart
 	p.Anchored = true
 	p.TopSurface = SMOOTH
 	p.BottomSurface = SMOOTH
-	p.Material = props.Material or Enum.Material.SmoothPlastic
+	p.Material = props.Material or MATERIAL_BY_COLOUR[props.Color] or M.SmoothPlastic
 	for key, value in props do
 		if key ~= "ClassName" and key ~= "Shape" and key ~= "Material" then
 			p[key] = value
@@ -90,13 +118,13 @@ local function comicBillboard(parent: Instance, title: string, subtitle: string?
 	name.BackgroundTransparency = 1
 	name.Size = UDim2.new(1, 0, 0.6, 0)
 	name.Position = UDim2.fromScale(0, if subtitle then 0.4 else 0.2)
-	name.Font = Enum.Font.LuckiestGuy
+	name.Font = Enum.Font.Merriweather
 	name.TextScaled = true
 	name.Text = title
 	name.TextColor3 = Color3.new(1, 1, 1)
 	name.Parent = gui
 	local stroke = Instance.new("UIStroke")
-	stroke.Thickness = 3
+	stroke.Thickness = 2
 	stroke.Color = Palette.Ink
 	stroke.Parent = name
 
@@ -104,13 +132,13 @@ local function comicBillboard(parent: Instance, title: string, subtitle: string?
 		local sub = Instance.new("TextLabel")
 		sub.BackgroundTransparency = 1
 		sub.Size = UDim2.new(1, 0, 0.38, 0)
-		sub.Font = Enum.Font.FredokaOne
+		sub.Font = Enum.Font.GothamMedium
 		sub.TextScaled = true
 		sub.Text = subtitle
 		sub.TextColor3 = Palette.Yellow
 		sub.Parent = gui
 		local s2 = Instance.new("UIStroke")
-		s2.Thickness = 2.5
+		s2.Thickness = 2
 		s2.Color = Palette.Ink
 		s2.Parent = sub
 	end
@@ -147,10 +175,10 @@ local function setupLighting()
 	Lighting.EnvironmentDiffuseScale = 1
 	Lighting.EnvironmentSpecularScale = 0.6
 	Lighting.GlobalShadows = true
-	Lighting.ShadowSoftness = 0.15 -- crisp, cartoon-like shadows
+	Lighting.ShadowSoftness = 0.25
 	Lighting.ClockTime = 14
 	Lighting.GeographicLatitude = 30
-	Lighting.ExposureCompensation = 0.1
+	Lighting.ExposureCompensation = 0
 
 	for _, child in Lighting:GetChildren() do
 		if child:IsA("PostEffect") or child:IsA("Atmosphere") or child:IsA("Sky") then
@@ -159,32 +187,33 @@ local function setupLighting()
 	end
 
 	local sky = Instance.new("Sky")
-	sky.SunAngularSize = 16
-	sky.MoonAngularSize = 14
+	sky.SunAngularSize = 11
+	sky.MoonAngularSize = 9
 	sky.StarCount = 2500
 	sky.Parent = Lighting
 
 	local atmosphere = Instance.new("Atmosphere")
-	atmosphere.Density = 0.28
-	atmosphere.Offset = 0.2
-	atmosphere.Color = Color3.fromRGB(196, 230, 255)
-	atmosphere.Decay = Color3.fromRGB(110, 158, 214)
-	atmosphere.Glare = 0.25
-	atmosphere.Haze = 1.2
+	atmosphere.Name = "SeaAir"
+	atmosphere.Density = 0.32
+	atmosphere.Offset = 0.15
+	atmosphere.Color = Color3.fromRGB(199, 214, 226)
+	atmosphere.Decay = Color3.fromRGB(106, 128, 150)
+	atmosphere.Glare = 0.35
+	atmosphere.Haze = 1.6
 	atmosphere.Parent = Lighting
 
 	local grade = Instance.new("ColorCorrectionEffect")
-	grade.Name = "ComicGrade"
-	grade.Saturation = 0.28
-	grade.Contrast = 0.14
-	grade.Brightness = 0.02
-	grade.TintColor = Color3.fromRGB(255, 250, 240)
+	grade.Name = "Grade"
+	grade.Saturation = 0.08
+	grade.Contrast = 0.08
+	grade.Brightness = 0
+	grade.TintColor = Color3.fromRGB(255, 251, 244)
 	grade.Parent = Lighting
 
 	local bloom = Instance.new("BloomEffect")
-	bloom.Intensity = 0.55
-	bloom.Size = 24
-	bloom.Threshold = 1.5
+	bloom.Intensity = 0.35
+	bloom.Size = 28
+	bloom.Threshold = 1.8
 	bloom.Parent = Lighting
 
 	local rays = Instance.new("SunRaysEffect")
@@ -195,21 +224,21 @@ end
 
 local function setupTerrainLook()
 	Terrain.WaterColor = Palette.Water
-	Terrain.WaterTransparency = 0.55
-	Terrain.WaterReflectance = 0.35
-	Terrain.WaterWaveSize = 0.25
-	Terrain.WaterWaveSpeed = 10
+	Terrain.WaterTransparency = 0.4
+	Terrain.WaterReflectance = 0.6
+	Terrain.WaterWaveSize = 0.55
+	Terrain.WaterWaveSpeed = 12
 
 	Terrain:SetMaterialColor(Enum.Material.Grass, Palette.Grass)
 	Terrain:SetMaterialColor(Enum.Material.Sand, Palette.Sand)
-	Terrain:SetMaterialColor(Enum.Material.Rock, Color3.fromRGB(142, 138, 150))
-	Terrain:SetMaterialColor(Enum.Material.Basalt, Color3.fromRGB(96, 90, 104))
+	Terrain:SetMaterialColor(Enum.Material.Rock, Color3.fromRGB(122, 118, 112))
+	Terrain:SetMaterialColor(Enum.Material.Basalt, Color3.fromRGB(78, 74, 76))
 	Terrain:SetMaterialColor(Enum.Material.Snow, Palette.Snow)
-	Terrain:SetMaterialColor(Enum.Material.Ground, Color3.fromRGB(150, 116, 80))
+	Terrain:SetMaterialColor(Enum.Material.Ground, Color3.fromRGB(116, 92, 66))
 
 	local clouds = Terrain:FindFirstChildOfClass("Clouds") or Instance.new("Clouds")
-	clouds.Cover = 0.55
-	clouds.Density = 0.75
+	clouds.Cover = 0.6
+	clouds.Density = 0.6
 	clouds.Color = Color3.fromRGB(255, 255, 255)
 	clouds.Parent = Terrain
 end
@@ -648,7 +677,7 @@ local function makeStall(parent, def, cf: CFrame)
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.fromScale(1, 1)
 	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.LuckiestGuy
+	label.Font = Enum.Font.Merriweather
 	label.TextScaled = true
 	label.Text = "TRADER"
 	label.TextColor3 = accent
@@ -661,7 +690,30 @@ local function makeStall(parent, def, cf: CFrame)
 	local npc, torso = makeNPC(parent, def.Trader.Name, "🛒 Trader", cf * CFrame.new(0, 1, 0.5), def.Trader.Shirt, def.Trader.Hat)
 	npc:SetAttribute("IslandId", def.Id)
 	CollectionService:AddTag(npc, "Trader")
-	addPrompt(torso, "Trade", def.Trader.Name)
+	local trade = addPrompt(torso, "Trade", def.Trader.Name)
+	trade.Name = "TradePrompt"
+	trade:SetAttribute("Need", "Empty")
+	CollectionService:AddTag(trade, "FilteredPrompt")
+	local sell = addPrompt(torso, "Sell crate", def.Trader.Name)
+	sell.Name = "SellPrompt"
+	sell:SetAttribute("Need", "Crate")
+	CollectionService:AddTag(sell, "FilteredPrompt")
+
+	-- Loading pad: bought crates appear here
+	local padCF = cf * CFrame.new(0, 0.3, -16)
+	local pad = newPart(m, {
+		Name = "CratePad",
+		Size = Vector3.new(12, 0.6, 9),
+		CFrame = padCF,
+		Color = Palette.WoodLight,
+	})
+	pad:SetAttribute("IslandId", def.Id)
+	CollectionService:AddTag(pad, "CratePad")
+	for _, x in { -5.6, 5.6 } do
+		newPart(m, { Name = "PadEdge", Size = Vector3.new(0.6, 0.8, 9.2), CFrame = padCF * CFrame.new(x, 0.3, 0), Color = Palette.WoodDark })
+	end
+	local padSign = newPart(m, { Name = "PadSign", Size = Vector3.new(1, 1, 1), CFrame = padCF * CFrame.new(0, 5, 0), Transparency = 1, CanCollide = false })
+	comicBillboard(padSign, "Loading Pad", "your crates appear here", 0, 60)
 	return m
 end
 
@@ -703,7 +755,7 @@ local function makeShipwright(parent, cf: CFrame)
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.fromScale(1, 1)
 	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.LuckiestGuy
+	label.Font = Enum.Font.Merriweather
 	label.TextScaled = true
 	label.Text = "SHIPWRIGHT"
 	label.TextColor3 = Palette.Red
@@ -763,7 +815,7 @@ local function buildIsland(def)
 		makeLighthouse(folder, Vector3.new(lighthousePos.X, ly - 1, lighthousePos.Z))
 		block(lighthousePos, 12)
 
-		local hutColors = { { Palette.Cream, Palette.Blue }, { Color3.fromRGB(255, 226, 180), Palette.Red }, { Color3.fromRGB(210, 240, 255), Palette.Teal } }
+		local hutColors = { { Palette.Plaster, Palette.RoofTile }, { Palette.Cream, Palette.RoofTile }, { Palette.Plaster, Palette.WoodDark } }
 		local hutSpots = { Vector3.new(30, 0, -20), Vector3.new(-45, 0, 20), Vector3.new(12, 0, -48) }
 		for i, offset in hutSpots do
 			local pos = c + offset
@@ -793,11 +845,14 @@ local function buildIsland(def)
 		end
 		block(spawnPos, 12)
 
-		-- Berth buoys
-		for i = 1, Config.MAX_BERTHS do
-			local berth = Islands.GetBerthCFrame(i)
-			local outward = if berth.Position.X > c.X then 1 else -1
-			makeBuoy(folder, berth.Position + Vector3.new(outward * 20, 0, -27), if i % 2 == 0 then Palette.Red else Palette.Green)
+		-- Buoys mark the edge of the safe harbour
+		local dock = Islands.GetDockPoint(def)
+		for i = 0, 23 do
+			local a = i / 24 * math.pi * 2
+			local pos = dock + Vector3.new(math.cos(a), 0, math.sin(a)) * Islands.HOME_HARBOUR_RADIUS
+			if groundAt(pos.X, pos.Z) < -8 then
+				makeBuoy(folder, pos, if i % 2 == 0 then Palette.Red else Palette.White)
+			end
 		end
 	else
 		makeBuoy(folder, pierEnd + right * 18 + dir * 6, Palette.Red)
@@ -924,6 +979,91 @@ local function startSpinners()
 end
 
 --------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- Virtual drydocks
+--------------------------------------------------------------------------------
+
+-- Builds a private stone drydock around `origin` sized for the build bounds.
+-- Returns the model and a CFrame on the walkway where builders stand.
+function WorldBuilder.CreateDrydock(origin: Vector3, bounds, slot: number)
+	local g = Config.GRID
+	local width = (bounds.MaxX - bounds.MinX + 1) * g + 16
+	local length = (bounds.MaxZ - bounds.MinZ + 1) * g + 16
+	local centre = origin + Vector3.new((bounds.MinX + bounds.MaxX) / 2 * g, 0, (bounds.MinZ + bounds.MaxZ) / 2 * g)
+	local floorY, walkY, wall, walk = -10, 4, 4, 10
+
+	local m = newModel(Workspace, `Drydock{slot}`)
+	m:SetAttribute("Drydock", slot)
+
+	local function slab(name, size, pos, color, extra)
+		local props = extra or {}
+		props.Name = name
+		props.Size = size
+		props.CFrame = CFrame.new(pos)
+		props.Color = color
+		return newPart(m, props)
+	end
+
+	-- Basin floor and walls
+	slab("Floor", Vector3.new(width, 2, length), centre + Vector3.new(0, floorY - 1, 0), Palette.Stone)
+	local wallHeight = walkY - floorY
+	for _, side in { -1, 1 } do
+		slab("WallX", Vector3.new(wall, wallHeight, length + wall * 2), centre + Vector3.new(side * (width / 2 + wall / 2), floorY + wallHeight / 2, 0), Palette.Stone)
+		slab("WallZ", Vector3.new(width, wallHeight, wall), centre + Vector3.new(0, floorY + wallHeight / 2, side * (length / 2 + wall / 2)), Palette.Stone)
+	end
+	-- Walkway all around
+	local outerW, outerL = width + (wall + walk) * 2, length + (wall + walk) * 2
+	for _, side in { -1, 1 } do
+		slab("WalkX", Vector3.new(walk, 1, outerL), centre + Vector3.new(side * (width / 2 + wall + walk / 2), walkY - 0.5, 0), Palette.WoodLight)
+		slab("WalkZ", Vector3.new(width + wall * 2, 1, walk), centre + Vector3.new(0, walkY - 0.5, side * (length / 2 + wall + walk / 2)), Palette.WoodLight)
+	end
+	-- Still water in the basin (purely visual)
+	slab("Water", Vector3.new(width, 0.3, length), centre + Vector3.new(0, Config.SEA_LEVEL - 0.15, 0), Palette.Water, {
+		Material = M.Glass,
+		Transparency = 0.35,
+		CanCollide = false,
+		CanQuery = false,
+		CanTouch = false,
+		CastShadow = false,
+	})
+	-- Scaffolding along both long sides
+	for _, side in { -1, 1 } do
+		local x = side * (width / 2 + wall / 2)
+		for z = -length / 2 + 6, length / 2 - 6, 12 do
+			vcyl(m, "Scaffold", centre + Vector3.new(x, walkY + 6, z), 12, 0.6, Palette.WoodDark)
+		end
+		slab("ScaffoldBeam", Vector3.new(0.6, 0.6, length - 8), centre + Vector3.new(x, walkY + 11.5, 0), Palette.WoodDark)
+		slab("ScaffoldDeck", Vector3.new(3, 0.4, length - 8), centre + Vector3.new(x - side * 1.2, walkY + 7, 0), Palette.WoodLight)
+	end
+	-- Lamps on the corners
+	for _, sx in { -1, 1 } do
+		for _, sz in { -1, 1 } do
+			local p = centre + Vector3.new(sx * (width / 2 + wall + walk - 1.5), walkY, sz * (length / 2 + wall + walk - 1.5))
+			vcyl(m, "LampPost", p + Vector3.new(0, 4, 0), 8, 0.5, Palette.Ink)
+			local lamp = newPart(m, { Name = "Lamp", Size = Vector3.new(1.2, 1.4, 1.2), CFrame = CFrame.new(p + Vector3.new(0, 8.6, 0)), Color = Palette.Lamp, Material = M.Neon })
+			local light = Instance.new("PointLight")
+			light.Range = 40
+			light.Brightness = 1.6
+			light.Color = Palette.Lamp
+			light.Parent = lamp
+		end
+	end
+	-- Dock clerk sells parts right here
+	local clerkFeet = centre + Vector3.new(width / 2 + wall + walk / 2, walkY, length / 2 - 4)
+	local clerk, torso = makeNPC(m, "Dock Clerk Pim", "🔨 Parts & Supplies", CFrame.lookAt(clerkFeet, clerkFeet - Vector3.new(1, 0, 0)), Palette.Orange, Palette.Ink)
+	addPrompt(torso, "Shop", "Dock Clerk Pim")
+	CollectionService:AddTag(clerk, "Shipwright") -- after the prompt exists, the shop hooks it on tag
+
+	local signPart = newPart(m, { Name = "Sign", Size = Vector3.new(1, 1, 1), CFrame = CFrame.new(centre + Vector3.new(0, walkY + 16, -length / 2)), Transparency = 1, CanCollide = false })
+	comicBillboard(signPart, `Drydock {slot}`, "build, then press B to launch", 0, 400)
+
+	local walkwayPos = centre + Vector3.new(width / 2 + wall + walk / 2, walkY + 3, 0)
+	return {
+		Model = m,
+		Walkway = CFrame.lookAt(walkwayPos, Vector3.new(centre.X, walkwayPos.Y, centre.Z)),
+	}
+end
 
 function WorldBuilder.Build()
 	worldFolder = Instance.new("Folder")

@@ -6,44 +6,60 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Remotes = require(Shared.Remotes)
+local ShipGrid = require(Shared.ShipGrid)
 
 local StateService = {}
-local DataService, ShipService
+local S
 
 local pending: { [Player]: boolean } = {}
 local stateEvent = Remotes.Event("StateUpdate")
 local notifyEvent = Remotes.Event("Notify")
 
 function StateService.Init(services)
-	DataService = services.DataService
-	ShipService = services.ShipService
+	S = services
 end
 
-local function cargoCount(cargo): number
-	local n = 0
-	for _, amount in cargo do
-		n += amount
+local function holdSummary(ship)
+	local counts = {}
+	for _, list in ship.Holds do
+		for _, goodId in list do
+			counts[goodId] = (counts[goodId] or 0) + 1
+		end
 	end
-	return n
+	return counts
 end
-StateService.CargoCount = cargoCount
 
 function StateService.Send(player: Player)
-	local profile = DataService.Get(player)
+	local profile = S.DataService.Get(player)
 	if not profile or not player.Parent then
 		return
 	end
-	local ship = ShipService.Get(player)
+	local own = S.ShipService.Get(player)
+	local sailing = S.ShipService.ShipFor(player) -- captain's ship if crew
+	local vesselOk, vesselRules = ShipGrid.VesselCheck(profile.Blueprint)
+	local carried = S.CargoService.GetCarried(player)
 	stateEvent:FireClient(player, {
 		Gold = profile.Gold,
 		Inventory = profile.Inventory,
-		Cargo = profile.Cargo,
-		CargoCount = cargoCount(profile.Cargo),
 		Blueprint = profile.Blueprint,
-		Stats = ship and ship.Stats,
-		Building = ship ~= nil and ship.Building,
-		DockedAt = ship and ship.DockedAt,
-		Berth = ship and ship.Berth,
+		Bounds = own and own.Bounds,
+		Vessel = { Ok = vesselOk, Rules = vesselRules },
+		Building = own ~= nil and own.Building,
+		Ship = sailing and {
+			Id = sailing.Id,
+			Own = sailing == own,
+			Stats = sailing.Stats,
+			HP = sailing.HP,
+			Crates = S.ShipService.CrateCount(sailing),
+			Cargo = holdSummary(sailing),
+			DockedAt = sailing.DockedAt,
+			Sinking = sailing.Sinking,
+			Building = sailing.Building,
+		},
+		Carrying = carried and carried.Good,
+		Crew = S.CrewService.Summary(player),
+		Quest = S.QuestService.Summary(player),
+		Passes = S.GamepassService.Owned(player),
 		SeenTutorial = profile.SeenTutorial,
 		Lifetime = profile.Stats,
 	})

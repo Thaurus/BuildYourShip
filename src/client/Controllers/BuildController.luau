@@ -52,9 +52,68 @@ function BuildController.Init(ctx)
 	bar.BackgroundTransparency = 1
 	bar.AnchorPoint = Vector2.new(0.5, 1)
 	bar.Position = UDim2.new(0.5, 0, 1, -16)
-	bar.Size = UDim2.fromOffset(1000, 150)
+	bar.Size = UDim2.fromOffset(1100, 140)
 	bar.Visible = false
 	bar.Parent = ctx.Screen
+	local barScale = Instance.new("UIScale")
+	barScale.Parent = bar
+	local function fitBar()
+		barScale.Scale = math.min(1, (camera.ViewportSize.X - 40) / 1100)
+	end
+	camera:GetPropertyChangedSignal("ViewportSize"):Connect(fitBar)
+	fitBar()
+
+	-- Seaworthiness checklist: the ship can only launch when every line is green
+	local checklist = UIKit.Card({
+		Color = C.Paper,
+		Size = UDim2.fromOffset(330, 232),
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 16, 1, -224),
+		Stroke = 3,
+		Parent = ctx.Screen,
+	})
+	checklist.Visible = false
+	UIKit.Label({
+		Text = "Seaworthiness check",
+		Font = UIKit.TitleFont,
+		TextSize = 18,
+		Size = UDim2.new(1, -24, 0, 26),
+		Position = UDim2.fromOffset(12, 8),
+		Parent = checklist,
+	})
+	local checkLabel = UIKit.Label({
+		Text = "",
+		RichText = true,
+		TextSize = 14,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		LineHeight = 1.25,
+		Size = UDim2.new(1, -24, 0, 140),
+		Position = UDim2.fromOffset(12, 36),
+		Parent = checklist,
+	})
+	local launchButton = UIKit.Button({
+		Text = "⛵ Launch ship [B]",
+		Color = C.Green,
+		Size = UDim2.new(1, -24, 0, 40),
+		Position = UDim2.new(0, 12, 1, -50),
+		TextSize = 17,
+		Parent = checklist,
+		OnClick = function()
+			ctx.Invoke("ToggleBuild")
+		end,
+	})
+	local function refreshChecklist()
+		local data = State.Data
+		if not data or not data.Vessel then
+			return
+		end
+		local lines = {}
+		for _, rule in data.Vessel.Rules do
+			table.insert(lines, (if rule.Ok then "<font color=\"#3F7A3A\">✔</font>  " else "<font color=\"#A43A30\">✖</font>  ") .. rule.Text)
+		end
+		checkLabel.Text = table.concat(lines, "\n")
+		UIKit.SetEnabled(launchButton, data.Vessel.Ok)
+	end
 
 	local info = UIKit.Card({
 		Color = C.Paper,
@@ -102,7 +161,7 @@ function BuildController.Init(ctx)
 		local button = UIKit.Button({
 			Text = "",
 			Color = C.White,
-			Size = UDim2.fromOffset(64, 76),
+			Size = UDim2.fromOffset(58, 72),
 			LayoutOrder = i,
 			Parent = slots,
 			OnClick = function()
@@ -111,9 +170,9 @@ function BuildController.Init(ctx)
 		})
 		UIKit.Label({
 			Text = def.Icon,
-			TextSize = 30,
+			TextSize = 26,
 			TextXAlignment = Enum.TextXAlignment.Center,
-			Size = UDim2.new(1, 0, 0, 44),
+			Size = UDim2.new(1, 0, 0, 40),
 			Position = UDim2.fromOffset(0, 6),
 			Parent = button,
 		})
@@ -146,8 +205,8 @@ function BuildController.Init(ctx)
 	local deleteButton = UIKit.Button({
 		Text = "🗑️",
 		Color = C.Red,
-		Size = UDim2.fromOffset(64, 76),
-		TextSize = 30,
+		Size = UDim2.fromOffset(58, 72),
+		TextSize = 26,
 		LayoutOrder = 100,
 		Parent = slots,
 		OnClick = function()
@@ -158,8 +217,8 @@ function BuildController.Init(ctx)
 	UIKit.Button({
 		Text = "🔨+",
 		Color = C.Purple,
-		Size = UDim2.fromOffset(64, 76),
-		TextSize = 24,
+		Size = UDim2.fromOffset(58, 72),
+		TextSize = 22,
 		LayoutOrder = 101,
 		Parent = slots,
 		OnClick = function()
@@ -173,14 +232,14 @@ function BuildController.Init(ctx)
 			slot.Count.Text = `x{n}`
 			local isSelected = id == selected and not deleteMode
 			slot.Button.BackgroundColor3 = if isSelected then C.Yellow elseif n > 0 then C.White else C.Grey
-			slot.Button.Outline.Thickness = if isSelected then 5 else 3
+			slot.Button.Outline.Thickness = if isSelected then 3.5 else 2
 		end
-		deleteButton.Outline.Thickness = if deleteMode then 5 else 3
+		deleteButton.Outline.Thickness = if deleteMode then 3.5 else 2
 		deleteButton.BackgroundColor3 = if deleteMode then C.Yellow else C.Red
 
 		local hints = "<b>Click</b> place · <b>R</b> rotate · <b>X</b> delete · <b>B</b> launch"
 		if deleteMode then
-			infoLabel.Text = `<b><font color="#D8443A">DELETE MODE</font></b> - click a block to take it back.  {hints}`
+			infoLabel.Text = `<b><font color="#A43A30">DELETE MODE</font></b> - click a block to take it back.  {hints}`
 		elseif selected then
 			local def = Items.Get(selected)
 			infoLabel.Text = `<b>{def.Icon} {def.Name}</b>  <font color="#8A8274">{Items.StatsText(selected)}</font><br/>{hints}`
@@ -201,7 +260,7 @@ function BuildController.Init(ctx)
 	end
 
 	local function shipRoot(): (Model?, BasePart?)
-		local ship = State.GetShipModel()
+		local ship = State.GetOwnShipModel()
 		local root = ship and ship:FindFirstChild("Root")
 		return ship, root :: BasePart?
 	end
@@ -237,7 +296,7 @@ function BuildController.Init(ctx)
 		end
 
 		if bounds then
-			local b = Config.BUILD_BOUNDS
+			local b = data.Bounds or Config.BUILD_BOUNDS
 			local center = Vector3.new((b.MinX + b.MaxX) / 2, (b.MinY + b.MaxY) / 2, (b.MinZ + b.MaxZ) / 2) * G
 			bounds.CFrame = root.CFrame * CFrame.new(center)
 		end
@@ -280,19 +339,21 @@ function BuildController.Init(ctx)
 		end
 		local normal = majorAxis(root.CFrame:VectorToObjectSpace(result.Normal))
 		local cell = hit + normal
-		local valid, reason = ShipGrid.CanPlace(data.Blueprint, occ, selected, cell.X, cell.Y, cell.Z, rotation)
+		local rot = ShipGrid.EffectiveRotation(selected, rotation)
+		local valid, reason = ShipGrid.CanPlace(data.Blueprint, occ, selected, cell.X, cell.Y, cell.Z, rot, data.Bounds)
 		if valid and State.Count(selected) < 1 then
 			valid, reason = false, "You have none left - craft or buy more!"
 		end
 
-		local key = `{selected}:{rotation}`
+		-- Bows change shape with their side of the ship, so the ghost depends on x too
+		local key = `{selected}:{rot}:{math.sign(cell.X)}`
 		if key ~= ghostKey then
 			clearGhost()
-			ghost = BlockFactory.MakeGhost(BlockFactory.Create(selected))
+			ghost = BlockFactory.MakeGhost(BlockFactory.Create(selected, { X = cell.X }))
 			ghost.Parent = camera
 			ghostKey = key
 		end
-		ghost:PivotTo(root.CFrame * ShipGrid.CellToCFrame(cell.X, cell.Y, cell.Z, rotation))
+		ghost:PivotTo(root.CFrame * ShipGrid.CellToCFrame(cell.X, cell.Y, cell.Z, rot))
 		selection.Adornee = ghost
 		selection.Color3 = if valid then VALID else INVALID
 		selection.SurfaceColor3 = selection.Color3
@@ -328,6 +389,8 @@ function BuildController.Init(ctx)
 	local function enter()
 		active = true
 		bar.Visible = true
+		checklist.Visible = true
+		refreshChecklist()
 		if not selected then
 			for _, id in placeable do
 				if State.Count(id) > 0 then
@@ -337,7 +400,7 @@ function BuildController.Init(ctx)
 			end
 			selected = selected or placeable[1]
 		end
-		local b = Config.BUILD_BOUNDS
+		local b = (State.Data and State.Data.Bounds) or Config.BUILD_BOUNDS
 		bounds = Instance.new("Part")
 		bounds.Name = "BuildBounds"
 		bounds.Anchored = true
@@ -359,6 +422,7 @@ function BuildController.Init(ctx)
 	local function exit()
 		active = false
 		bar.Visible = false
+		checklist.Visible = false
 		if renderConnection then
 			renderConnection:Disconnect()
 			renderConnection = nil
@@ -380,6 +444,7 @@ function BuildController.Init(ctx)
 		end
 		if active then
 			refreshBar()
+			refreshChecklist()
 		end
 	end)
 

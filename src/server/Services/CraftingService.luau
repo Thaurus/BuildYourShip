@@ -9,13 +9,23 @@ local Items = require(Shared.Items)
 local Remotes = require(Shared.Remotes)
 
 local CraftingService = {}
-local InventoryService, StateService
+local InventoryService, StateService, QuestService, GamepassService
 
 local MAX_BATCH = 50
 
 function CraftingService.Init(services)
 	InventoryService = services.InventoryService
 	StateService = services.StateService
+	QuestService = services.QuestService
+	GamepassService = services.GamepassService
+end
+
+function CraftingService.PriceFor(player: Player, id: string): number
+	local price = Items.Get(id).Price
+	if GamepassService.Has(player, "ShipwrightFriend") then
+		price = math.ceil(price * 0.75)
+	end
+	return price
 end
 
 local function validAmount(amount: any): number?
@@ -52,8 +62,10 @@ function CraftingService.Craft(player: Player, id: any, amount: any)
 	if not InventoryService.ConsumeRecipe(player, def.Recipe, amount) then
 		return { ok = false, msg = "Not enough materials!" }
 	end
-	InventoryService.Add(player, id, amount)
-	return { ok = true, msg = `Crafted {amount}x {def.Icon} {def.Name}!` }
+	local made = amount * def.Yield
+	InventoryService.Add(player, id, made)
+	QuestService.Fire(player, "Craft", id, made)
+	return { ok = true, msg = `Crafted {made}x {def.Icon} {def.Name}!` }
 end
 
 function CraftingService.Buy(player: Player, id: any, amount: any)
@@ -65,11 +77,12 @@ function CraftingService.Buy(player: Player, id: any, amount: any)
 	if not nearShipwright(player) then
 		return { ok = false, msg = "Visit the Shipwright in Port Haven to shop." }
 	end
-	local cost = def.Price * amount
+	local cost = CraftingService.PriceFor(player, id) * amount
 	if not InventoryService.SpendGold(player, cost) then
 		return { ok = false, msg = `You need {cost} gold.` }
 	end
 	InventoryService.Add(player, id, amount)
+	QuestService.Fire(player, "Craft", id, amount) -- buying counts for "get one of these" steps
 	return { ok = true, msg = `Bought {amount}x {def.Icon} {def.Name} for {cost}g` }
 end
 

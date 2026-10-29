@@ -28,12 +28,13 @@ end
 
 local function defaultProfile()
 	return {
-		Version = 1,
+		Version = 2,
 		Gold = Config.STARTING_GOLD,
-		Inventory = { Wood = 10, Fiber = 6, Plank = 6 },
-		Cargo = {},
+		Inventory = { Wood = 4, Fiber = 6 },
+		Holds = {}, -- [cell key] = { goodId, ... } crates stowed in each cargo hold
 		Blueprint = ShipGrid.StarterBlueprint(),
 		Stats = { GoldEarned = 0, Trades = 0, Harvests = 0 },
+		Quest = { Step = 1, Progress = 0 },
 		SeenTutorial = false,
 	}
 end
@@ -54,14 +55,30 @@ local function sanitize(raw)
 			end
 		end
 	end
-	if type(raw.Cargo) == "table" then
-		for id, n in raw.Cargo do
-			if Goods.Get(id) and type(n) == "number" and n > 0 then
-				profile.Cargo[id] = math.floor(n)
+	profile.Blueprint = ShipGrid.Sanitize(raw.Blueprint, Config.BIG_BUILD_BOUNDS) or profile.Blueprint
+	-- Only keep crates in holds that still exist on the ship
+	if type(raw.Holds) == "table" then
+		local holdKeys = {}
+		for _, e in profile.Blueprint do
+			if e.t == "CargoHold" then
+				holdKeys[ShipGrid.Key(e.x, e.y, e.z)] = true
+			end
+		end
+		for key, list in raw.Holds do
+			if holdKeys[key] and type(list) == "table" then
+				local clean = {}
+				for _, goodId in list do
+					if Goods.Get(goodId) and #clean < Config.CRATES_PER_HOLD then
+						table.insert(clean, goodId)
+					end
+				end
+				profile.Holds[key] = clean
 			end
 		end
 	end
-	profile.Blueprint = ShipGrid.Sanitize(raw.Blueprint) or profile.Blueprint
+	if type(raw.Quest) == "table" and type(raw.Quest.Step) == "number" and type(raw.Quest.Progress) == "number" then
+		profile.Quest = { Step = math.max(1, math.floor(raw.Quest.Step)), Progress = math.max(0, math.floor(raw.Quest.Progress)) }
+	end
 	if type(raw.Stats) == "table" then
 		for key, value in raw.Stats do
 			if type(value) == "number" then

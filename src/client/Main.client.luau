@@ -14,11 +14,17 @@ local InventoryPanel = require(Client.UI.InventoryPanel)
 local ShopPanel = require(Client.UI.ShopPanel)
 local MarketPanel = require(Client.UI.MarketPanel)
 local Tutorial = require(Client.UI.Tutorial)
+local CrewPanel = require(Client.UI.CrewPanel)
+local StorePanel = require(Client.UI.StorePanel)
 local BuildController = require(Client.Controllers.BuildController)
 local OutlineController = require(Client.Controllers.OutlineController)
 local EffectsController = require(Client.Controllers.EffectsController)
 local NavigationController = require(Client.Controllers.NavigationController)
 local HelmController = require(Client.Controllers.HelmController)
+local PromptController = require(Client.Controllers.PromptController)
+local CombatController = require(Client.Controllers.CombatController)
+local QuestController = require(Client.Controllers.QuestController)
+local WeatherController = require(Client.Controllers.WeatherController)
 
 local screen = Instance.new("ScreenGui")
 screen.Name = "BuildYourShipUI"
@@ -39,12 +45,18 @@ ctx.Invoke = HUD.Invoke
 ctx.Panels.Inventory = InventoryPanel.Init(ctx)
 ctx.Panels.Shop = ShopPanel.Init(ctx)
 ctx.Panels.Market = MarketPanel.Init(ctx)
+ctx.Panels.Crew = CrewPanel.Init(ctx)
+ctx.Panels.Store = StorePanel.Init(ctx)
 ctx.Panels.Tutorial = Tutorial.Init(ctx)
 BuildController.Init(ctx)
 OutlineController.Init()
 EffectsController.Init(ctx)
 NavigationController.Init(ctx)
 HelmController.Init()
+PromptController.Init()
+CombatController.Init(ctx)
+QuestController.Init(ctx)
+WeatherController.Init(ctx)
 
 UserInputService.InputBegan:Connect(function(input, processed)
 	if processed or UserInputService:GetFocusedTextBox() then
@@ -56,6 +68,8 @@ UserInputService.InputBegan:Connect(function(input, processed)
 		ctx.Invoke("ToggleBuild")
 	elseif input.KeyCode == Enum.KeyCode.H then
 		ctx.Invoke("BoardShip")
+	elseif input.KeyCode == Enum.KeyCode.C then
+		ctx.Panels.Crew.Toggle()
 	elseif input.KeyCode == Enum.KeyCode.Escape then
 		UIKit.CloseAll()
 	end

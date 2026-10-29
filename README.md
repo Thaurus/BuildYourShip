@@ -1,38 +1,93 @@
 # ⚓ Build Your Ship
 
-A Roblox trading-and-building game: start with a tiny boat, farm materials on the
-islands, craft ship parts, expand your ship block by block and get rich hauling
-cargo between island traders. Clean, realistic-comic look: smooth plastic,
-saturated colours, crisp shadows, strong colour grading and ink outlines.
+A Roblox sailing, trading and shipbuilding game. Farm materials on the islands,
+craft ship parts, build a real-looking vessel block by block in your own
+drydock, haul physical cargo crates between island traders — and survive
+pirates, storms and rival captains along the way. Bring friends as crew.
 
-## Gameplay loop
+The look is realistic with an illustrated edge: Future lighting, real
+materials (planks, fabric sails, iron, plaster, clay roof tiles), natural
+colour grading, tapered hulls, billowing sails and subtle ink outlines.
 
-1. **Gather** - Hold `E` on trees (🪵 Wood), flax bushes (🌿 Fiber) and glowing ore
-   rocks (🪨 Iron Ore, only on Ironrock and Frostpeak). Nodes regrow after 25s.
-2. **Craft** - Press `I`. Wood → Planks, Fiber → Rope / Sailcloth, Ore + Wood → Iron
-   Ingots, then blocks: hulls, decks, cargo crates, sails, rudders, steam engines...
-3. **Shop** - Bosun Bertha the Shipwright (Port Haven) sells everything for gold.
-4. **Build** - Sail into your berth on the long Port Haven pier and press `B`.
-   Click to place blocks, `R` rotates, `X` toggles delete, `1-9` selects, `B` launches.
-5. **Sail** - Press `H` to take the helm. `W/S` throttle, `A/D` steer (mobile
-   thumbstick works too). Floating markers show each island's distance and goods.
-6. **Trade** - Talk to an island's trader with your ship docked at their pier.
-   Buy goods marked **LOCAL** cheaply, sell them where they're **WANTED**. Prices
-   react to trading and recover over time.
+## The guided path
 
-### Ship stats
+New players get a welcome card, then a quest tracker (top right) with a
+glowing waypoint walks them through the whole loop:
 
-Every block adds weight; hulls add float, sails/engines add thrust, crates add
-cargo space, rudders add turning.
+1. Chop wood → craft planks → craft hull blocks
+2. Open the drydock (`B` next to your ship) and lengthen your ship
+3. Launch (the vessel check must pass)
+4. Buy a crate of fish, carry it aboard and stow it
+5. Take the helm (`H`), sail to Ironrock, carry the crate to the trader and sell it
+6. Mine iron, craft a cannon, mount it, sink a pirate ship (`F` broadside)
+7. Invite a friend to your crew, then earn 2,000 gold trading
 
-| Stat | Rule |
+All quests live in `src/shared/Quests.luau`.
+
+## Systems
+
+### Building: the virtual drydock
+- There are **no fixed berths**. Ships moor at any free spot in Port Haven's
+  harbour (computed at runtime), so the world never needs changing for more players.
+- Pressing `B` near your ship moves it into a **private drydock generated on
+  demand** far from the ocean (`Config.DRYDOCK_ORIGIN`, one slot per builder).
+  A dock clerk there sells parts. Pressing `B` again launches the ship back
+  into the harbour.
+- Build controls: click to place, `R` rotate, `X` delete mode, `1-9` select.
+
+### Ships must look like ships
+Placement rules (`ShipGrid.CanPlace`): keels only under the hull, deck
+equipment (sails, cannons, holds, helm...) only on top of something, nothing
+else below the waterline. A live **seaworthiness check** (`ShipGrid.VesselCheck`)
+must be all green to launch:
+
+- has a helm and a sail or engine
+- waterline hull of 6+ blocks
+- the front row is all **Bow** blocks, with one in the centre
+- longer than wide (+2)
+- at least 80% left/right symmetric
+
+Bows taper automatically depending on which side of the centre line they sit,
+so a row of three forms a pointed prow with a bowsprit.
+
+### Physical cargo
+- Every trade good is a **crate**. Buying one puts it on the trader's loading pad.
+- Pick it up (`E`), walk it aboard (you walk slower) and stow it in a **Cargo
+  Crate** block (2 crates each). The hull's float limits how much you can load.
+- To sell, take a crate out of the hold and carry it to a trader. `G` drops a
+  crate; dropped crates float in water.
+- When a ship sinks, its crates spill into the sea for anyone to grab.
+
+### Danger at sea (PvP on)
+- Ships have hull HP (sum of their blocks). Iron hull is the armour.
+- **Cannons**: crew can fire any cannon (`E`), or press `F` for a broadside on
+  the side your camera looks at (camera pitch sets the range). Uses Cannonballs.
+- At 0 HP the ship sinks; player ships are rebuilt in Port Haven after a short delay.
+- **Pirates** (NPC ships) patrol, hunt players and fight broadside-to-broadside.
+  Sinking one pays a bounty split by damage dealt, and spills loot.
+- **Storms** roam the open sea: rain, fog, lightning, bigger swell, wind
+  pushing the ship, and heavily loaded ships take on water. Keels help.
+- Port Haven's harbour (ringed by buoys) is a **safe zone**: no damage, free repairs.
+  Repair Kits patch the hull at sea.
+
+### Crew / co-op
+Captains invite players from the Crew panel (`C`). Crew members can board the
+captain's ship (`H`), carry and stow cargo and man cannons. Gold from selling
+the crew's crates is **split equally** between all crew members online.
+
+### Gamepasses
+Defined in `Config.GAMEPASSES` (shown in the in-game Store):
+
+| Pass | Effect |
 | --- | --- |
-| Top speed | `3.5 × thrust / √(weight incl. cargo)`, capped at 70 |
-| Cargo space | `min(crate capacity, float − weight)` |
-| Overloaded | weight > float: the ship sits low and crawls at 25% speed |
-| Turning | `0.5 + 0.25 per rudder` (max 1.6 rad/s), slower for heavy ships |
+| 🏗️ Grand Shipyard | build frame 11 × 23 × 9 instead of 7 × 15 × 7 |
+| 💰 Merchant Guild | +25% gold from every crate you sell |
+| 🔨 Shipwright's Friend | 25% off in the shop |
 
-### Islands & trade routes
+Create the passes on the Creator Dashboard and paste their IDs into
+`src/shared/Config.luau`. Passes with `Id = 0` show as "coming soon".
+
+## Islands & trade routes
 
 | Island | Resources | Sells (cheap) | Wants (pays well) |
 | --- | --- | --- | --- |
@@ -42,17 +97,13 @@ cargo space, rudders add turning.
 | 🌶️ Spice Atoll | palms, flax | 🌶️ Spices | 🐟 Fish, 🛠️ Tools, 🏺 Pottery, 🧣 Furs |
 | ❄️ Frostpeak | snowy pines, iron ore | 🧣 Furs | 🌶️ Spices, ☕ Coffee, 🍍 Fruit |
 
-All island/goods/item numbers live in `src/shared/Islands.luau`, `Goods.luau`
-and `Items.luau`; global tuning lives in `src/shared/Config.luau`.
-
 ## Running it
 
-The project uses [Rojo](https://rojo.space) to sync code into Roblox Studio.
-The whole world (ocean, islands, docks, NPCs, lighting) is generated by code
-when the server starts, so no `.rbxl` is needed.
+The project uses [Rojo](https://rojo.space). The whole world (ocean, islands,
+piers, NPCs, lighting) is generated by code at server start, so no `.rbxl` is needed.
 
 ```bash
-rokit install        # or: aftman / foreman, or install Rojo 7.4+ manually
+rokit install        # or install Rojo 7.4+ manually
 rojo serve           # then click "Connect" in the Rojo Studio plugin
 # or build a place file:
 rojo build -o BuildYourShip.rbxl
@@ -60,58 +111,43 @@ rojo build -o BuildYourShip.rbxl
 
 In Studio:
 
-- Press **Play**. World generation takes a few seconds (the ocean is terrain water).
+- Press **Play**. World generation takes a few seconds.
 - To save progress, publish the place and enable
   *Game Settings → Security → Enable Studio Access to API Services*.
-  Without it the game still runs; progress just isn't saved.
-- Set *Max Players* to 10 or fewer (the harbour has 10 berths).
-- `Lighting.Technology` is set to **Future** by the project file for the best look.
+- `Lighting.Technology` is set to **Future** by the project file.
+- Custom shapes are generated from parts in code (`BlockFactory`, `WorldBuilder`);
+  no uploaded meshes or images are required.
 
 ## Project layout
 
 ```
 src/
-  shared/                 ReplicatedStorage.Shared - used by server and client
-    Config.luau           tuning values
-    Items.luau            resources, materials, ship blocks (recipes, prices, stats)
-    Goods.luau            trade goods
-    Islands.luau          island definitions, markets, docks, berths
-    ShipGrid.luau         blueprint grid math + placement/removal validation
-    ShipStats.luau        speed / cargo / float from a blueprint
-    BlockFactory.luau     the visual model of every block (also used for ghosts)
+  shared/                 ReplicatedStorage.Shared
+    Config.luau           tuning values, gamepasses
+    Items.luau            resources, materials, tools, ship blocks
+    Goods.luau            trade goods (one unit = one crate)
+    Islands.luau          islands, markets, docks, safe harbour
+    Quests.luau           the guided quest line
+    ShipGrid.luau         grid math, placement rules, vessel check
+    ShipStats.luau        speed / float / crates / HP from a blueprint
+    BlockFactory.luau     procedural models for every block and crate
     Remotes.luau          all RemoteEvents / RemoteFunctions
-  server/                 ServerScriptService.Server
-    Main.server.luau      bootstrap
-    Services/
-      WorldBuilder        lighting, terrain ocean + islands, props, NPCs, piers
-      DataService         DataStore load/save with sanitising
-      StateService        pushes state snapshots + notifications to clients
-      InventoryService    items & gold
-      HarvestService      trees / bushes / ore nodes
-      CraftingService     crafting + Shipwright shop
-      MarketService       island markets with dynamic prices
-      ShipService         ship spawning, build mode, physics sailing, docking
-  client/                 StarterPlayerScripts.Client
-    Main.client.luau      bootstrap + hotkeys
-    ClientState / Sounds
-    UI/                   UIKit (comic widgets), HUD, Inventory, Shop, Market, Tutorial
-    Controllers/          Build, Helm, Outline (ink outlines), Effects, Navigation
+  server/Services/
+    WorldBuilder          lighting, terrain, islands, props, NPCs, piers, drydocks
+    ShipService           ships, harbour moorings, drydock, sailing, damage, sinking
+    CargoService          crates: pads, carrying, stowing, spilling
+    CombatService         cannons, cannonball simulation, effects
+    PirateService         NPC pirate AI and bounties
+    StormService          roaming storms
+    CrewService           crews and invitations
+    QuestService          quest progress and rewards
+    GamepassService       pass ownership and purchases
+    MarketService         island prices, buying and selling crates
+    CraftingService       crafting and the shop
+    HarvestService        trees / bushes / ore
+    DataService / InventoryService / StateService
+  client/
+    UI/                   UIKit, HUD, Inventory, Shop, Market, Crew, Store, Tutorial
+    Controllers/          Build, Helm, Prompt, Combat, Quest, Weather, Outline,
+                          Effects, Navigation
 ```
-
-## How ships work
-
-A ship is an invisible `Root` part with every block welded to it (blocks are
-massless). The server drives three constraints on the root:
-`LinearVelocity` (plane mode) for speed/heading, a Y-only `AlignPosition` for the
-waterline and bobbing, and `AlignOrientation` for heading plus gentle sway. The
-captain's client owns the physics for smooth sailing and reports helm input.
-Blueprints are a list of `{ t, x, y, z, r }` grid entries; the same `ShipGrid`
-code validates on the server and previews on the client.
-
-## Ideas for next steps
-
-- Delivery contracts with timers and bonus pay
-- Weather and rough seas that punish overloaded ships
-- Cannons, pirates and repairable hull damage
-- Crew: let friends join your ship and man extra sails
-- Custom meshes / textures for even richer comic visuals

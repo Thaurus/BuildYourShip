@@ -1,4 +1,5 @@
--- Always-on HUD: gold, location, ship card, action buttons and the helm gauge.
+-- Always-on HUD: gold, location, ship card (hull, cargo, load), action buttons,
+-- the helm gauge and context hints (carrying a crate, broadside).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,73 +18,82 @@ local HUD = {}
 
 local player = Players.LocalPlayer
 
-local function pill(parent, position, anchor, color, width)
+local function pill(parent, position, anchor, color, width, height)
 	local frame = UIKit.Card({
 		Color = color,
-		Size = UDim2.fromOffset(width, 50),
+		Size = UDim2.fromOffset(width, height or 46),
 		Position = position,
 		AnchorPoint = anchor,
-		Radius = 25,
+		Radius = 23,
 		Parent = parent,
 	})
 	UIKit.Shade(frame)
 	return frame
 end
 
+local function bar(parent, position, size)
+	local back = UIKit.Card({ Color = C.PaperDark, Size = size, Position = position, Radius = 6, Stroke = 2, Parent = parent })
+	local fill = Instance.new("Frame")
+	fill.BackgroundColor3 = C.Green
+	fill.Size = UDim2.fromScale(0.5, 1)
+	fill.BorderSizePixel = 0
+	fill.Parent = back
+	UIKit.Corner(fill, 6)
+	return fill
+end
+
 function HUD.Init(ctx)
 	local screen = ctx.Screen
 	local State = ctx.State
 
+	local function invoke(name: string, ...)
+		local remote = Remotes.Function(name)
+		local ok, result = pcall(remote.InvokeServer, remote, ...)
+		if ok and result and result.msg then
+			UIKit.Toast(screen, result.msg, if result.ok then "good" else "bad")
+		end
+		return ok and result
+	end
+	HUD.Invoke = invoke
+
 	--------------------------------------------------------------------------
 	-- Gold
 	--------------------------------------------------------------------------
-	local goldPill = pill(screen, UDim2.fromOffset(16, 16), Vector2.zero, C.Yellow, 190)
-	local coin = UIKit.Card({
-		Color = C.Orange,
-		Size = UDim2.fromOffset(40, 40),
-		Position = UDim2.fromOffset(5, 5),
-		Radius = 20,
-		Parent = goldPill,
-	})
+	local goldPill = pill(screen, UDim2.fromOffset(16, 16), Vector2.zero, C.Paper, 180)
 	UIKit.Label({
-		Text = "$",
-		Font = UIKit.TitleFont,
+		Text = "🪙",
 		TextSize = 26,
-		TextColor3 = C.Yellow,
 		TextXAlignment = Enum.TextXAlignment.Center,
-		Size = UDim2.fromScale(1, 1),
-		Outlined = 2,
-		Parent = coin,
+		Size = UDim2.fromOffset(46, 46),
+		Parent = goldPill,
 	})
 	local goldLabel = UIKit.Label({
 		Text = "0",
 		Font = UIKit.TitleFont,
-		TextSize = 30,
-		TextColor3 = C.White,
-		Outlined = 3,
-		Position = UDim2.fromOffset(54, 0),
-		Size = UDim2.new(1, -60, 1, 0),
+		TextSize = 26,
+		Position = UDim2.fromOffset(48, 0),
+		Size = UDim2.new(1, -56, 1, 0),
 		Parent = goldPill,
 	})
 	local goldValue = Instance.new("NumberValue")
 	goldValue.Changed:Connect(function(v)
-		goldLabel.Text = tostring(math.floor(v + 0.5))
+		goldLabel.Text = `{math.floor(v + 0.5)}g`
 	end)
 	local goldScale = Instance.new("UIScale")
 	goldScale.Parent = goldPill
 	local lastGold = nil
 
 	--------------------------------------------------------------------------
-	-- Location banner
+	-- Location
 	--------------------------------------------------------------------------
-	local location = pill(screen, UDim2.new(0.5, 0, 0, 16), Vector2.new(0.5, 0), C.Blue, 300)
+	local location = pill(screen, UDim2.new(0.5, 0, 0, 16), Vector2.new(0.5, 0), C.Blue, 320)
 	local locationLabel = UIKit.Label({
-		Text = "🌊 Open Sea",
+		Text = "",
 		Font = UIKit.TitleFont,
-		TextSize = 24,
+		TextSize = 20,
 		TextColor3 = C.White,
 		TextXAlignment = Enum.TextXAlignment.Center,
-		Outlined = 2,
+		Outlined = 1,
 		Size = UDim2.fromScale(1, 1),
 		Parent = location,
 	})
@@ -93,81 +103,49 @@ function HUD.Init(ctx)
 	--------------------------------------------------------------------------
 	local card = UIKit.Card({
 		Color = C.Paper,
-		Size = UDim2.fromOffset(250, 168),
+		Size = UDim2.fromOffset(270, 196),
 		Position = UDim2.new(0, 16, 1, -16),
 		AnchorPoint = Vector2.new(0, 1),
-		Radius = 16,
-		Stroke = 4,
+		Radius = 12,
+		Stroke = 3,
 		Parent = screen,
 	})
-	local cardBanner = UIKit.Card({
-		Color = C.Teal,
-		Size = UDim2.fromOffset(170, 34),
-		Position = UDim2.fromOffset(-8, -16),
-		Radius = 10,
-		Parent = card,
-	})
-	cardBanner.Rotation = -3
-	UIKit.Label({
-		Text = "⛵ YOUR SHIP",
+	local cardTitle = UIKit.Label({
+		Text = "Your Ship",
 		Font = UIKit.TitleFont,
 		TextSize = 20,
-		TextColor3 = C.White,
-		TextXAlignment = Enum.TextXAlignment.Center,
-		Outlined = 2,
-		Size = UDim2.fromScale(1, 1),
-		Parent = cardBanner,
-	})
-	local buildBadge = UIKit.Card({
-		Color = C.Orange,
-		Size = UDim2.fromOffset(90, 28),
-		Position = UDim2.new(1, -96, 0, -12),
-		Radius = 8,
+		Size = UDim2.new(1, -24, 0, 26),
+		Position = UDim2.fromOffset(12, 8),
 		Parent = card,
 	})
-	buildBadge.Rotation = 4
-	buildBadge.Visible = false
-	UIKit.Label({
-		Text = "BUILDING",
-		Font = UIKit.TitleFont,
-		TextSize = 16,
-		TextColor3 = C.White,
-		TextXAlignment = Enum.TextXAlignment.Center,
-		Outlined = 2,
-		Size = UDim2.fromScale(1, 1),
-		Parent = buildBadge,
-	})
-
-	local rows = {}
-	local function row(order, icon)
-		local label = UIKit.Label({
-			Text = icon,
-			TextSize = 18,
-			Size = UDim2.new(1, -24, 0, 22),
-			Position = UDim2.fromOffset(14, 22 + (order - 1) * 26),
-			Parent = card,
-		})
-		rows[order] = label
-		return label
-	end
-	local speedRow = row(1, "")
-	local cargoRow = row(2, "")
-	local loadRow = row(3, "")
-	local blocksRow = row(4, "")
-
-	local loadBarBack = UIKit.Card({
-		Color = C.White,
-		Size = UDim2.new(1, -28, 0, 16),
-		Position = UDim2.fromOffset(14, 130),
+	local badge = UIKit.Card({
+		Color = C.Orange,
+		Size = UDim2.fromOffset(96, 24),
+		Position = UDim2.new(1, -104, 0, 10),
 		Radius = 8,
 		Stroke = 2,
 		Parent = card,
 	})
-	local loadBar = Instance.new("Frame")
-	loadBar.BackgroundColor3 = C.Green
-	loadBar.Size = UDim2.fromScale(0.3, 1)
-	loadBar.Parent = loadBarBack
-	UIKit.Corner(loadBar, 8)
+	local badgeLabel = UIKit.Label({
+		Text = "",
+		Font = UIKit.TitleFont,
+		TextSize = 13,
+		TextColor3 = C.White,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		Size = UDim2.fromScale(1, 1),
+		Parent = badge,
+	})
+
+	local hpLabel = UIKit.Label({ Text = "", RichText = true, TextSize = 15, Size = UDim2.new(1, -24, 0, 18), Position = UDim2.fromOffset(12, 38), Parent = card })
+	local hpFill = bar(card, UDim2.fromOffset(12, 58), UDim2.new(1, -24, 0, 12))
+	local function row(y)
+		return UIKit.Label({ Text = "", RichText = true, TextSize = 15, Size = UDim2.new(1, -24, 0, 20), Position = UDim2.fromOffset(12, y), Parent = card })
+	end
+	local speedRow = row(78)
+	local cargoRow = row(100)
+	local loadRow = row(122)
+	local loadFill = bar(card, UDim2.fromOffset(12, 144), UDim2.new(1, -24, 0, 12))
+	local extraRow = row(162)
 
 	--------------------------------------------------------------------------
 	-- Action buttons
@@ -175,36 +153,36 @@ function HUD.Init(ctx)
 	local actions = Instance.new("Frame")
 	actions.BackgroundTransparency = 1
 	actions.AnchorPoint = Vector2.new(1, 0.5)
-	actions.Position = UDim2.new(1, -16, 0.5, 0)
-	actions.Size = UDim2.fromOffset(170, 260)
+	actions.Position = UDim2.new(1, -16, 0.55, 0)
+	actions.Size = UDim2.fromOffset(170, 400)
 	actions.Parent = screen
 	local list = Instance.new("UIListLayout")
-	list.Padding = UDim.new(0, 10)
+	list.Padding = UDim.new(0, 8)
 	list.HorizontalAlignment = Enum.HorizontalAlignment.Right
 	list.SortOrder = Enum.SortOrder.LayoutOrder
 	list.Parent = actions
-
-	local function invoke(name: string, ...)
-		local ok, result = pcall(Remotes.Function(name).InvokeServer, Remotes.Function(name), ...)
-		if ok and result and result.msg then
-			UIKit.Toast(screen, result.msg, if result.ok then "good" else "bad")
-		end
-		return ok and result
-	end
-	HUD.Invoke = invoke
 
 	local buildButton
 	local buttons = {
 		{ "🎒 Items [I]", C.Purple, function()
 			ctx.Panels.Inventory.Toggle()
 		end },
-		{ "🔨 Build [B]", C.Orange, function()
+		{ "🔨 Drydock [B]", C.Orange, function()
 			invoke("ToggleBuild")
 		end },
-		{ "☸️ Helm [H]", C.Blue, function()
+		{ "☸️ Board [H]", C.Blue, function()
 			invoke("BoardShip")
 		end },
-		{ "🧭 Reset Ship", C.Teal, function()
+		{ "🤝 Crew [C]", C.Teal, function()
+			ctx.Panels.Crew.Toggle()
+		end },
+		{ "🧰 Repair", C.Green, function()
+			invoke("RepairShip")
+		end },
+		{ "⭐ Store", C.Yellow, function()
+			ctx.Panels.Store.Toggle()
+		end },
+		{ "🧭 Tow home", C.Grey, function()
 			invoke("ResetShip")
 		end },
 	}
@@ -212,8 +190,8 @@ function HUD.Init(ctx)
 		local b = UIKit.Button({
 			Text = spec[1],
 			Color = spec[2],
-			Size = UDim2.fromOffset(170, 50),
-			TextSize = 20,
+			Size = UDim2.fromOffset(170, 44),
+			TextSize = 17,
 			LayoutOrder = i,
 			Parent = actions,
 			OnClick = spec[3],
@@ -224,28 +202,37 @@ function HUD.Init(ctx)
 	end
 
 	--------------------------------------------------------------------------
-	-- Helm gauge (only while steering)
+	-- Bottom-centre: helm gauge and hints
 	--------------------------------------------------------------------------
-	local gauge = pill(screen, UDim2.new(0.5, 0, 1, -20), Vector2.new(0.5, 1), C.Paper, 280)
-	gauge.Size = UDim2.fromOffset(280, 64)
+	local gauge = pill(screen, UDim2.new(0.5, 0, 1, -20), Vector2.new(0.5, 1), C.Paper, 320, 64)
 	gauge.Visible = false
 	local gaugeLabel = UIKit.Label({
 		Text = "0 kn",
 		Font = UIKit.TitleFont,
-		TextSize = 32,
-		TextColor3 = C.Ink,
+		TextSize = 28,
 		TextXAlignment = Enum.TextXAlignment.Center,
-		Size = UDim2.new(1, 0, 0, 40),
+		Size = UDim2.new(1, 0, 0, 38),
+		Position = UDim2.fromOffset(0, 2),
 		Parent = gauge,
 	})
 	UIKit.Label({
-		Text = "W/S sail · A/D steer · Space to leave",
-		TextSize = 14,
-		TextColor3 = C.Ink,
+		Text = "W/S sail · A/D steer · F broadside · Space leave",
+		TextSize = 13,
 		TextXAlignment = Enum.TextXAlignment.Center,
 		Size = UDim2.new(1, 0, 0, 18),
 		Position = UDim2.fromOffset(0, 40),
 		Parent = gauge,
+	})
+
+	local hint = pill(screen, UDim2.new(0.5, 0, 1, -94), Vector2.new(0.5, 1), C.Yellow, 520, 44)
+	hint.Visible = false
+	local hintLabel = UIKit.Label({
+		Text = "",
+		RichText = true,
+		TextSize = 16,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		Size = UDim2.fromScale(1, 1),
+		Parent = hint,
 	})
 
 	RunService.RenderStepped:Connect(function()
@@ -256,8 +243,7 @@ function HUD.Init(ctx)
 		gauge.Visible = steering
 		if steering then
 			local v = seat.AssemblyLinearVelocity
-			local speed = Vector3.new(v.X, 0, v.Z).Magnitude
-			gaugeLabel.Text = `⛵ {math.floor(speed + 0.5)} kn`
+			gaugeLabel.Text = `⛵ {math.floor(Vector3.new(v.X, 0, v.Z).Magnitude + 0.5)} kn`
 		end
 	end)
 
@@ -268,7 +254,7 @@ function HUD.Init(ctx)
 		if lastGold ~= data.Gold then
 			if lastGold ~= nil then
 				TweenService:Create(goldValue, TweenInfo.new(0.6, Enum.EasingStyle.Quad), { Value = data.Gold }):Play()
-				goldScale.Scale = 1.2
+				goldScale.Scale = 1.15
 				TweenService:Create(goldScale, TweenInfo.new(0.35, Enum.EasingStyle.Back), { Scale = 1 }):Play()
 			else
 				goldValue.Value = data.Gold
@@ -276,42 +262,68 @@ function HUD.Init(ctx)
 			lastGold = data.Gold
 		end
 
+		local ship = data.Ship
+		local stats = ship and ship.Stats
+		buildButton.Text = if data.Building then "⛵ Launch [B]" else "🔨 Drydock [B]"
+
+		-- Location banner
 		if data.Building then
-			locationLabel.Text = "🔨 Shipyard - Build Mode"
+			locationLabel.Text = "🔨 Your drydock"
 			location.BackgroundColor3 = C.Orange
-		elseif data.DockedAt then
-			locationLabel.Text = `⚓ Docked: {Islands.Get(data.DockedAt).Name}`
+		elseif ship and ship.DockedAt == "PortHaven" then
+			locationLabel.Text = "🛡️ Port Haven · safe harbour"
 			location.BackgroundColor3 = C.Green
+		elseif ship and ship.DockedAt then
+			locationLabel.Text = `⚓ Moored at {Islands.Get(ship.DockedAt).Name}`
+			location.BackgroundColor3 = C.Teal
 		else
-			locationLabel.Text = "🌊 Open Sea"
+			locationLabel.Text = "🌊 Open sea · beware of pirates"
 			location.BackgroundColor3 = C.Blue
 		end
 
-		buildBadge.Visible = data.Building
-		buildButton.Text = if data.Building then "⛵ Launch [B]" else "🔨 Build [B]"
-
-		local stats = data.Stats
+		-- Ship card
+		card.Visible = stats ~= nil
 		if stats then
-			speedRow.Text = `💨 Top speed  <b>{math.floor(stats.MaxSpeed + 0.5)} kn</b>`
-			speedRow.RichText = true
+			cardTitle.Text = if ship.Own then "Your Ship" else `{data.Crew.Captain}'s Ship`
+			badge.Visible = data.Building or ship.Sinking
+			badgeLabel.Text = if ship.Sinking then "SINKING" else "IN DRYDOCK"
+			badge.BackgroundColor3 = if ship.Sinking then C.Red else C.Orange
+
+			local hpFrac = math.clamp(ship.HP / stats.MaxHP, 0, 1)
+			hpLabel.Text = `🛡️ Hull <b>{math.floor(ship.HP)} / {stats.MaxHP}</b>`
+			hpFill.Size = UDim2.fromScale(hpFrac, 1)
+			hpFill.BackgroundColor3 = if hpFrac > 0.5 then C.Green elseif hpFrac > 0.25 then C.Yellow else C.Red
+
+			speedRow.Text = `💨 Top speed <b>{math.floor(stats.MaxSpeed + 0.5)} kn</b>   ⚙️ Thrust <b>{stats.Thrust}</b>`
 			local cargoParts = {}
 			for _, id in Goods.Order do
-				local n = data.Cargo[id]
+				local n = ship.Cargo[id]
 				if n then
 					table.insert(cargoParts, `{Goods.Get(id).Icon}{n}`)
 				end
 			end
-			cargoRow.RichText = true
-			cargoRow.Text = `📦 Cargo  <b>{data.CargoCount} / {stats.MaxCargo}</b>  {table.concat(cargoParts, " ")}`
-			loadRow.RichText = true
+			cargoRow.Text = `📦 Crates <b>{ship.Crates} / {stats.MaxCrates}</b>  {table.concat(cargoParts, " ")}`
 			local loadPct = math.floor(stats.Load * 100 + 0.5)
 			loadRow.Text = if stats.Overloaded
-				then `⚠️ <font color="#E84C40"><b>Overloaded! {loadPct}%</b></font>`
-				else `⚖️ Load  <b>{loadPct}%</b> of float`
-			blocksRow.RichText = true
-			blocksRow.Text = `🧱 Blocks  <b>{stats.Blocks}</b>   ⚙️ Thrust <b>{stats.Thrust}</b>`
-			loadBar.Size = UDim2.fromScale(math.clamp(stats.Load, 0.02, 1), 1)
-			loadBar.BackgroundColor3 = if stats.Load > 1 then C.Red elseif stats.Load > 0.8 then C.Orange else C.Green
+				then `⚠️ <font color="#A43A30"><b>Overloaded! {loadPct}%</b></font>`
+				else `⚖️ Load <b>{loadPct}%</b> of float`
+			loadFill.Size = UDim2.fromScale(math.clamp(stats.Load, 0.02, 1), 1)
+			loadFill.BackgroundColor3 = if stats.Load > 1 then C.Red elseif stats.Load > 0.8 then C.Orange else C.Green
+			extraRow.Text = `💣 Cannons <b>{stats.Cannons}</b>   🧱 Blocks <b>{stats.Blocks}</b>   ⚫ <b>{data.Inventory.Cannonball or 0}</b>`
+		end
+
+		-- Context hint
+		if data.Carrying then
+			local good = Goods.Get(data.Carrying)
+			hint.Visible = true
+			hint.BackgroundColor3 = C.Yellow
+			hintLabel.Text = `Carrying <b>{good.Icon} {good.Name}</b> · stow it in a Cargo Crate (E) or sell it to a trader · <b>G</b> drop`
+		elseif ship and ship.Sinking then
+			hint.Visible = true
+			hint.BackgroundColor3 = C.Red
+			hintLabel.Text = "<b>Abandon ship!</b> It will be rebuilt in Port Haven shortly."
+		else
+			hint.Visible = false
 		end
 	end)
 end

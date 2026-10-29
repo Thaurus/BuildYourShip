@@ -78,8 +78,9 @@ Islands.Defs = {
 
 Islands.Order = { "PortHaven", "PalmCove", "Ironrock", "SpiceAtoll", "Frostpeak" }
 
-Islands.HOME_PIER_LENGTH = 340
+Islands.HOME_PIER_LENGTH = 160
 Islands.PIER_LENGTH = 56
+Islands.HOME_HARBOUR_RADIUS = 360 -- the safe harbour around Port Haven
 
 for id, def in Islands.Defs do
 	def.Id = id
@@ -96,7 +97,7 @@ function Islands.Get(id: string)
 	return Islands.Defs[id]
 end
 
--- Where ships moor. Being within DOCK_RADIUS of this point counts as "docked".
+-- Where ships moor. Being within the dock radius of this point counts as "docked".
 function Islands.GetDockPoint(def): Vector3
 	if def.Home then
 		return def.Position + def.DockDirection * (def.Radius + Islands.HOME_PIER_LENGTH * 0.5)
@@ -106,19 +107,16 @@ end
 
 function Islands.GetDockRadius(def): number
 	if def.Home then
-		return Islands.HOME_PIER_LENGTH * 0.5 + 60
+		return Islands.HOME_HARBOUR_RADIUS
 	end
 	return Config.DOCK_RADIUS
 end
 
--- Berths line both sides of Port Haven's long pier. Ships face out to sea.
-function Islands.GetBerthCFrame(index: number): CFrame
+-- No cannon fire or damage inside Port Haven's harbour.
+function Islands.IsSafe(position: Vector3): boolean
 	local home = Islands.Defs.PortHaven
-	local side = if index % 2 == 1 then -1 else 1
-	local row = math.floor((index - 1) / 2)
-	local pos = home.Position
-		+ Vector3.new(side * 22, Config.SEA_LEVEL - home.Position.Y, home.Radius + 44 + row * 56)
-	return CFrame.lookAt(pos, pos + Vector3.new(0, 0, 1))
+	local dock = Islands.GetDockPoint(home)
+	return Vector3.new(position.X - dock.X, 0, position.Z - dock.Z).Magnitude <= Islands.HOME_HARBOUR_RADIUS
 end
 
 function Islands.FindDocked(position: Vector3): string?

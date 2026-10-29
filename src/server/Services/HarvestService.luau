@@ -10,7 +10,7 @@ local Config = require(Shared.Config)
 local Items = require(Shared.Items)
 
 local HarvestService = {}
-local InventoryService, StateService, DataService
+local InventoryService, StateService, DataService, QuestService
 
 local NODE_TYPES = {
 	Wood = { Item = "Wood", Min = 2, Max = 3, Action = "Chop", Hold = 1.0 },
@@ -24,6 +24,7 @@ function HarvestService.Init(services)
 	InventoryService = services.InventoryService
 	StateService = services.StateService
 	DataService = services.DataService
+	QuestService = services.QuestService
 end
 
 local function setYieldVisible(node: Model, visible: boolean)
@@ -74,6 +75,7 @@ local function setupNode(node: Instance)
 
 		local amount = rng:NextInteger(nodeType.Min, nodeType.Max)
 		InventoryService.Add(player, nodeType.Item, amount)
+		QuestService.Fire(player, "Harvest", nodeType.Item, amount)
 		local profile = DataService.Get(player)
 		if profile then
 			profile.Stats.Harvests = (profile.Stats.Harvests or 0) + 1

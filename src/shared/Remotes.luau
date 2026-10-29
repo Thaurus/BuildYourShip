@@ -10,6 +10,8 @@ local EVENTS = {
 	"Notify", -- S -> C: toast / floating text
 	"OpenMarket", -- S -> C: trader prompt used
 	"OpenShop", -- S -> C: shipwright prompt used
+	"CrewInvite", -- S -> C: someone invited you to their crew
+	"Effect", -- S -> C: one-shot visual effect (explosion, splash, muzzle flash)
 	"TutorialDone", -- C -> S: player closed the welcome card
 	"HelmInput", -- C -> S: throttle / steer while at the helm
 }
@@ -18,12 +20,17 @@ local FUNCTIONS = {
 	"Craft",
 	"Buy",
 	"GetMarket",
-	"Trade",
+	"BuyCrate",
+	"DropCrate",
 	"ToggleBuild",
 	"PlaceBlock",
 	"RemoveBlock",
 	"BoardShip",
 	"ResetShip",
+	"RepairShip",
+	"FireBroadside",
+	"CrewAction",
+	"BuyGamepass",
 }
 
 local Remotes = {}

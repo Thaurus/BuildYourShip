@@ -1,9 +1,9 @@
 -- Grid math for ship blueprints. Used by the server for validation and by the
--- client for build previews, so both always agree.
+-- client for build previews and the vessel checklist, so both always agree.
 --
 -- A blueprint is an array of entries: { t = blockId, x = int, y = int, z = int, r = 0..3 }
 -- (x, y, z) is the anchor cell; r is the rotation around Y in 90 degree steps.
--- Ship forward is -Z (the root part's LookVector).
+-- Ship forward (the bow) is -Z, starboard is +X. Row y = 0 is the waterline.
 
 local Config = require(script.Parent.Config)
 local Items = require(script.Parent.Items)
@@ -47,8 +47,8 @@ function ShipGrid.Footprint(blockId: string, x: number, y: number, z: number, r:
 	return cells
 end
 
-function ShipGrid.InBounds(cell: Vector3): boolean
-	local b = Config.BUILD_BOUNDS
+function ShipGrid.InBounds(cell: Vector3, bounds): boolean
+	local b = bounds or Config.BUILD_BOUNDS
 	return cell.X >= b.MinX and cell.X <= b.MaxX and cell.Y >= b.MinY and cell.Y <= b.MaxY and cell.Z >= b.MinZ and cell.Z <= b.MaxZ
 end
 
@@ -73,7 +73,16 @@ local function isInteger(n: any): boolean
 	return type(n) == "number" and n == n and math.floor(n) == n
 end
 
-function ShipGrid.CanPlace(blueprint, occ, blockId: string, x: number, y: number, z: number, r: number): (boolean, string?)
+-- Rotation actually used for a block (bows, sterns, keels and rudders always face forward)
+function ShipGrid.EffectiveRotation(blockId: string, r: number): number
+	local def = Items.Get(blockId)
+	if def and def.Fixed then
+		return 0
+	end
+	return r
+end
+
+function ShipGrid.CanPlace(blueprint, occ, blockId: string, x: number, y: number, z: number, r: number, bounds): (boolean, string?)
 	local def = Items.Get(blockId)
 	if not def or def.Kind ~= "Block" then
 		return false, "That is not a ship block."
@@ -81,6 +90,7 @@ function ShipGrid.CanPlace(blueprint, occ, blockId: string, x: number, y: number
 	if not (isInteger(x) and isInteger(y) and isInteger(z) and isInteger(r)) or r < 0 or r > 3 then
 		return false, "Invalid position."
 	end
+	r = ShipGrid.EffectiveRotation(blockId, r)
 	if #blueprint >= Config.MAX_BLOCKS then
 		return false, `Your ship is at the {Config.MAX_BLOCKS} block limit!`
 	end
@@ -92,10 +102,32 @@ function ShipGrid.CanPlace(blueprint, occ, blockId: string, x: number, y: number
 		end
 	end
 
+	-- Placement rules keep ships looking like ships
+	local placement = def.Placement or "Hull"
+	if placement == "Keel" then
+		if y ~= -1 then
+			return false, "Keels go in the row under the waterline."
+		end
+		local above = occ[ShipGrid.Key(x, 0, z)]
+		if not above or not Items.HullTypes[blueprint[above].t] then
+			return false, "A keel must sit directly under a hull block."
+		end
+	elseif y < 0 then
+		return false, "Only keels go below the waterline."
+	end
+	if placement == "Mounted" then
+		if y < 1 then
+			return false, `{def.Name} goes on deck, on top of the hull.`
+		end
+		if not occ[ShipGrid.Key(x, y - 1, z)] then
+			return false, `{def.Name} needs something solid underneath.`
+		end
+	end
+
 	local footprint = ShipGrid.Footprint(blockId, x, y, z, r)
 	local own = {}
 	for _, cell in footprint do
-		if not ShipGrid.InBounds(cell) then
+		if not ShipGrid.InBounds(cell, bounds) then
 			return false, "Outside the shipyard frame."
 		end
 		local key = ShipGrid.Key(cell.X, cell.Y, cell.Z)
@@ -129,6 +161,19 @@ function ShipGrid.CanRemove(blueprint, occ, x: number, y: number, z: number): (n
 		return nil, "Your ship needs its helm!"
 	end
 
+	-- Anything standing on this block would lose its support
+	for i, other in blueprint do
+		if i ~= index then
+			local otherDef = Items.Get(other.t)
+			if otherDef.Placement == "Mounted" and occ[ShipGrid.Key(other.x, other.y - 1, other.z)] == index then
+				return nil, `Remove the {otherDef.Name} on top first.`
+			end
+			if otherDef.Placement == "Keel" and occ[ShipGrid.Key(other.x, 0, other.z)] == index then
+				return nil, "Remove the keel underneath first."
+			end
+		end
+	end
+
 	-- Flood fill from the helm without the removed block; everything must still be reachable.
 	local start
 	for i, e in blueprint do
@@ -144,26 +189,26 @@ function ShipGrid.CanRemove(blueprint, occ, x: number, y: number, z: number): (n
 		return index, nil
 	end
 
-	local visitedCells = {}
+	local visited = {}
 	local reached = { [index] = true }
 	local reachedCount = 1
 	local queue = { start }
-	visitedCells[ShipGrid.Key(start.X, start.Y, start.Z)] = true
+	visited[ShipGrid.Key(start.X, start.Y, start.Z)] = true
 	local head = 1
 	while head <= #queue do
 		local cell = queue[head]
 		head += 1
-		local ownerIndex = occ[ShipGrid.Key(cell.X, cell.Y, cell.Z)]
-		if ownerIndex and not reached[ownerIndex] then
-			reached[ownerIndex] = true
+		local owner = occ[ShipGrid.Key(cell.X, cell.Y, cell.Z)]
+		if owner and not reached[owner] then
+			reached[owner] = true
 			reachedCount += 1
 		end
 		for _, dir in NEIGHBOURS do
 			local n = cell + dir
 			local key = ShipGrid.Key(n.X, n.Y, n.Z)
 			local nIndex = occ[key]
-			if not visitedCells[key] and nIndex and nIndex ~= index then
-				visitedCells[key] = true
+			if not visited[key] and nIndex and nIndex ~= index then
+				visited[key] = true
 				table.insert(queue, n)
 			end
 		end
@@ -175,24 +220,100 @@ function ShipGrid.CanRemove(blueprint, occ, x: number, y: number, z: number): (n
 	return index, nil
 end
 
-function ShipGrid.StarterBlueprint()
-	local bp = {}
-	for x = -1, 1 do
-		for z = -2, 2 do
-			table.insert(bp, { t = "WoodHull", x = x, y = 0, z = z, r = 0 })
+--------------------------------------------------------------------------------
+-- Vessel check: a ship must look like a ship before it may be launched
+--------------------------------------------------------------------------------
+
+export type Rule = { Id: string, Text: string, Ok: boolean }
+
+function ShipGrid.VesselCheck(blueprint): (boolean, { Rule })
+	local hasHelm, thrust = false, 0
+	local waterline = {}
+	local byCell = {}
+	for _, e in blueprint do
+		local def = Items.Get(e.t)
+		if e.t == "Helm" then
+			hasHelm = true
+		end
+		if def.Stats and def.Stats.Thrust then
+			thrust += def.Stats.Thrust
+		end
+		if e.y == 0 and Items.HullTypes[e.t] then
+			table.insert(waterline, e)
+		end
+		byCell[ShipGrid.Key(e.x, e.y, e.z)] = e.t
+	end
+
+	local minX, maxX, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
+	for _, e in waterline do
+		minX, maxX = math.min(minX, e.x), math.max(maxX, e.x)
+		minZ, maxZ = math.min(minZ, e.z), math.max(maxZ, e.z)
+	end
+
+	local bowOk = #waterline > 0
+	local bowCentre = false
+	for _, e in waterline do
+		if e.z == minZ then
+			if e.t ~= "Bow" then
+				bowOk = false
+			elseif e.x == 0 then
+				bowCentre = true
+			end
 		end
 	end
-	table.insert(bp, { t = "Helm", x = 0, y = 1, z = 2, r = 0 })
-	table.insert(bp, { t = "SmallSail", x = 0, y = 1, z = -1, r = 0 })
-	table.insert(bp, { t = "CargoHold", x = -1, y = 1, z = 0, r = 0 })
-	table.insert(bp, { t = "CargoHold", x = 1, y = 1, z = 0, r = 0 })
-	table.insert(bp, { t = "Rudder", x = 0, y = 0, z = 3, r = 0 })
-	table.insert(bp, { t = "Flag", x = 0, y = 1, z = -2, r = 0 })
+
+	local length = if #waterline > 0 then maxZ - minZ + 1 else 0
+	local width = if #waterline > 0 then maxX - minX + 1 else 0
+
+	local mirrored = 0
+	for _, e in blueprint do
+		if e.x == 0 or byCell[ShipGrid.Key(-e.x, e.y, e.z)] == e.t then
+			mirrored += 1
+		end
+	end
+	local symmetry = if #blueprint > 0 then mirrored / #blueprint else 0
+
+	local rules: { Rule } = {
+		{ Id = "helm", Text = "Has a helm", Ok = hasHelm },
+		{ Id = "propulsion", Text = "Has a sail or engine", Ok = thrust > 0 },
+		{ Id = "hull", Text = `Waterline hull of 6+ blocks ({#waterline})`, Ok = #waterline >= 6 },
+		{ Id = "bow", Text = "Front row is all Bow blocks, one in the centre", Ok = bowOk and bowCentre },
+		{ Id = "length", Text = `Longer than wide (+2): {length} x {width}`, Ok = length >= width + 2 },
+		{ Id = "symmetry", Text = `Left and right match ({math.floor(symmetry * 100)}% / 80%)`, Ok = symmetry >= 0.8 },
+	}
+	local ok = true
+	for _, rule in rules do
+		ok = ok and rule.Ok
+	end
+	return ok, rules
+end
+
+--------------------------------------------------------------------------------
+
+function ShipGrid.StarterBlueprint()
+	local bp = {}
+	local function add(t, x, y, z, r)
+		table.insert(bp, { t = t, x = x, y = y, z = z, r = r or 0 })
+	end
+	for x = -1, 1 do
+		add("Bow", x, 0, -2)
+		for z = -1, 2 do
+			add("WoodHull", x, 0, z)
+		end
+	end
+	add("Stern", 0, 0, 3)
+	add("Rudder", 0, 0, 4)
+	add("Keel", 0, -1, 0)
+	add("Helm", 0, 1, 2)
+	add("SmallSail", 0, 1, -1)
+	add("CargoHold", -1, 1, 0)
+	add("CargoHold", 1, 1, 0)
+	add("Flag", 0, 1, 3)
 	return bp
 end
 
 -- Cleans up a blueprint loaded from storage. Returns nil if it is unusable.
-function ShipGrid.Sanitize(raw)
+function ShipGrid.Sanitize(raw, bounds)
 	if type(raw) ~= "table" then
 		return nil
 	end
@@ -202,10 +323,11 @@ function ShipGrid.Sanitize(raw)
 	for _, e in raw do
 		if type(e) == "table" and Items.IsBlock(e.t) and isInteger(e.x) and isInteger(e.y) and isInteger(e.z) then
 			local r = if isInteger(e.r) and e.r >= 0 and e.r <= 3 then e.r else 0
+			r = ShipGrid.EffectiveRotation(e.t, r)
 			local ok = true
 			local footprint = ShipGrid.Footprint(e.t, e.x, e.y, e.z, r)
 			for _, cell in footprint do
-				if not ShipGrid.InBounds(cell) or occ[ShipGrid.Key(cell.X, cell.Y, cell.Z)] then
+				if not ShipGrid.InBounds(cell, bounds) or occ[ShipGrid.Key(cell.X, cell.Y, cell.Z)] then
 					ok = false
 				end
 			end

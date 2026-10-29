@@ -16,7 +16,7 @@ function ShopPanel.Init(ctx)
 	local panel = UIKit.Panel(ctx.Screen, "Shipwright", UDim2.fromOffset(680, 500), C.Red)
 
 	UIKit.Label({
-		Text = "\"Short on timber, captain? I've got everything a ship needs... for a price!\"  - Bosun Bertha",
+		Text = "\"Short on timber, captain? I've got everything a ship needs... for a price!\"",
 		TextSize = 15,
 		TextColor3 = Color3.fromRGB(110, 100, 90),
 		Size = UDim2.new(1, 0, 0, 36),
@@ -64,7 +64,8 @@ function ShopPanel.Init(ctx)
 					Parent = card,
 				})
 				for i, amount in { 1, 5 } do
-					local cost = def.Price * amount
+					local unit = if data.Passes and data.Passes.ShipwrightFriend then math.ceil(def.Price * 0.75) else def.Price
+					local cost = unit * amount
 					local button = UIKit.Button({
 						Text = if amount == 1 then `{cost}g` else `x5 {cost}g`,
 						Color = if i == 1 then C.Yellow else C.Orange,
